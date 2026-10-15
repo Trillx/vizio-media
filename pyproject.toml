@@ -1,0 +1,9 @@
+[project]
+name = "vizio-media"
+version = "0.2.0"
+description = "A self-hosted SmartCast catalog, profile manager, and local playback app"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

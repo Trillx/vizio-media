@@ -1,0 +1,19 @@
+# Allow only application sources into the image build context.
+**
+!Dockerfile
+!requirements.txt
+!run.py
+!app/
+!app/*.py
+!web/
+!web/*.html
+!web/*.css
+!web/*.js
+!web/art/
+!web/art/*.svg
+!web/art/*.jpg
+!scripts/
+!scripts/download_sample.py
+!scripts/container_health.py
+!media/
+!media/ATTRIBUTION.md

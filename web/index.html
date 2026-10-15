@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151515">
+  <title>Vizio Media</title>
+  <link rel="icon" href="/static/art/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css?v=5">
+  <link rel="stylesheet" href="/static/library.css?v=2">
+  <link rel="stylesheet" href="/static/home.css?v=1">
+</head>
+<body>
+  <div id="stage" class="stage">
+    <header class="header">
+      <div class="brand"><img src="/static/art/mark.svg" alt="" width="48" height="48"><span>Vizio <strong>Media</strong></span></div>
+      <nav aria-label="Main navigation">
+        <button id="nav-home" class="nav active" data-action="home" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-7 9 7v10H3zM9 20v-7h6v7"/></svg>Home</button>
+        <button id="nav-watchlist" class="nav" data-action="home-watchlist">My list</button>
+        <button id="nav-search" class="nav" data-action="catalog"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M15 15l6 6"/></svg>Search</button>
+        <button id="nav-accounts" class="nav" data-action="accounts">Accounts</button>
+        <button id="nav-profile" class="nav profile-nav" data-action="profiles"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 22v-3a8 8 0 0 1 16 0v3"/></svg><span id="profile-name">Choose profile</span></button>
+        <button id="nav-remote" class="nav utility-nav" data-action="remote" aria-label="Remote check" title="Remote check"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="4"/><path d="M12 7v8M8 11h8M10 18h4"/></svg></button>
+        <button id="nav-checks" class="nav utility-nav" data-action="checks" aria-label="Test results" title="Test results"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M7 12l3 3 7-7"/></svg></button>
+      </nav>
+      <div id="connection" class="connection" role="status">Connecting to your server</div>
+    </header>
+
+    <main id="home" aria-label="Discover movies and series">
+      <nav class="home-genres" aria-label="Browse by genre">
+        <button id="genre-all" class="home-genre selected" data-action="home-genre" data-value="all" aria-pressed="true">For you</button>
+        <button id="genre-comedy" class="home-genre" data-action="home-genre" data-value="comedy" aria-pressed="false">Comedy</button>
+        <button id="genre-horror" class="home-genre" data-action="home-genre" data-value="horror" aria-pressed="false">Horror</button>
+        <button id="genre-science-fiction" class="home-genre" data-action="home-genre" data-value="science-fiction" aria-pressed="false">Sci-fi</button>
+        <button id="genre-animation" class="home-genre" data-action="home-genre" data-value="animation" aria-pressed="false">Animation</button>
+      </nav>
+      <div id="home-content" class="home-content">
+        <section id="home-feature" class="home-feature" aria-labelledby="home-title">
+          <div id="home-image" class="home-image"></div>
+          <div class="home-copy">
+            <div id="home-kicker" class="home-kicker">YOUR NEXT MOVIE NIGHT</div>
+            <h1 id="home-title">Find something<br>worth staying in for.</h1>
+            <div id="home-meta" class="home-meta">Movies, series, and a little inspiration.</div>
+            <p id="home-overview">Loading your catalog...</p>
+            <button id="hero-details" class="button primary" data-action="home-retry">Explore titles</button>
+          </div>
+        </section>
+        <p id="home-notice" class="home-notice" role="status" hidden></p>
+        <div id="home-lead"></div>
+        <div id="home-personal"></div>
+        <div id="home-shelves" aria-live="polite"></div>
+        <section id="home-samples" class="home-shelf" aria-labelledby="shelf-title">
+          <div class="home-heading"><h2 id="shelf-title">The screening room</h2><span>Check picture, sound, and your remote</span></div>
+          <div class="home-track">
+            <button id="card-bunny" class="home-film" data-action="details" data-title="bunny"><span class="home-film-art bunny"><span class="home-badge">Local trailer</span></span><span class="home-film-name">Big Buck Bunny</span><span class="home-film-meta">2008 / Animation</span><span class="card-progress"><span id="card-progress-fill"></span></span></button>
+            <button id="card-sintel" class="home-film" data-action="details" data-title="sintel"><span class="home-film-art sintel"><span class="home-badge">Sample title</span></span><span class="home-film-name">Sintel</span><span class="home-film-meta">2010 / Fantasy</span></button>
+            <button id="card-dream" class="home-film" data-action="details" data-title="dream"><span class="home-film-art dream"><span class="home-badge">Sample title</span></span><span class="home-film-name">Elephants Dream</span><span class="home-film-meta">2006 / Animation</span></button>
+          </div>
+          <div class="home-sample-actions"><button id="play-feature" class="button secondary" data-action="play"><span id="play-label">Play test clip</span></button><button id="details-feature" class="button secondary" data-action="details" data-title="bunny">Trailer details</button><span id="resume-note" class="resume-note">Picture, sound, and remote. Start here.</span></div>
+        </section>
+        <div class="home-credits"><img src="/static/art/tmdb.svg" alt="TMDB"><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p><button id="home-credits" class="button secondary compact" data-action="credits">Credits</button></div>
+      </div>
+    </main>
+
+    <footer class="footer"><div><span class="keycap">D-pad</span> Move <span class="keycap">OK</span> Select <span class="keycap">Back</span> Return</div><span id="last-key" hidden>Waiting for the first remote button</span><span class="build-label">Make a night of it.</span></footer>
+
+    <div id="dialog" class="overlay" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+      <section class="dialog-panel">
+        <div class="dialog-top"><h2 id="dialog-title">Film details</h2><button id="dialog-close" class="button secondary compact" data-action="close-dialog">Close</button></div>
+        <div id="dialog-content"></div>
+      </section>
+    </div>
+
+    <section id="player" class="player" aria-label="Video player" hidden>
+      <video id="video" preload="none" playsinline webkit-playsinline aria-label="Big Buck Bunny trailer"></video>
+      <div id="player-hud" class="player-hud">
+        <div class="player-top"><div><h2>Big Buck Bunny</h2><p id="player-status" role="status">Loading the local trailer...</p></div><span>Blender Foundation / CC BY 3.0</span></div>
+        <div class="player-bottom">
+          <div id="timeline" class="timeline" role="slider" tabindex="0" data-action="seek-position" aria-label="Playback position" aria-controls="video" aria-describedby="player-help" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="33" aria-valuenow="0" aria-valuetext="0:00 of 0:33">
+            <div id="timeline-track" class="timeline-track"><div id="timeline-fill"></div><div id="timeline-thumb" class="timeline-thumb"></div></div>
+          </div>
+          <div class="player-time"><span id="elapsed">0:00</span><span id="duration">0:33</span></div>
+          <div class="player-buttons">
+            <button id="seek-back" class="button secondary" data-action="seek-back"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3L3 7l4 4M3 7h9a8 8 0 1 1-8 9"/></svg>Back 10s</button>
+            <button id="toggle-play" class="button primary" data-action="toggle-play" data-state="pause"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path class="play-glyph" d="M7 3l15 9-15 9z"/><path class="pause-glyph" d="M8 4v16M16 4v16"/></svg><span id="toggle-label">Pause</span></button>
+            <button id="seek-forward" class="button secondary" data-action="seek-forward"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3l4 4-4 4M21 7h-9a8 8 0 1 0 8 9"/></svg>Forward 10s</button>
+            <button id="close-player" class="button secondary" data-action="close-player"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l-7 7 7 7M3 12h18"/></svg>Library</button>
+          </div>
+          <p id="player-help" class="player-help">Left / Right: choose button &nbsp; OK: select &nbsp; Up: timeline &nbsp; Back: library</p>
+        </div>
+      </div>
+    </section>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </div>
+  <script src="/static/remote.js?v=1"></script>
+  <script src="/static/app.js?v=5"></script>
+  <script src="/static/service-link.js?v=1"></script>
+  <script src="/static/library.js?v=2"></script>
+  <script src="/static/home.js?v=1"></script>
+</body>
+</html>

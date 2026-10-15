@@ -1,0 +1,51 @@
+/* Approved cinema shelves: charcoal, white, and explicit TV-safe colors. */
+.header .brand { width: 292px; flex-shrink: 0; }
+.header .nav { padding: 17px 19px; margin-right: 10px; }
+.header .profile-nav { max-width: 245px; }
+.header .connection { position: absolute; top: 78px; right: 0; font-size: 17px; padding: 0; }
+.home-genres { position: absolute; top: 145px; left: 94px; right: 94px; display: flex; }
+.home-genre { min-height: 59px; padding: 13px 27px; margin-right: 14px; border-radius: 8px; background: #2e2e2e; color: #deded8; font-size: 24px; }
+.home-genre.selected { background: #e8e8e3; color: #151515; }
+.home-genre.focused, .home-genre:focus, .home-genre:hover { outline: 4px solid #ffffff; outline-offset: 5px; background: #ffffff; color: #151515; }
+.home-content { position: absolute; top: 228px; bottom: 88px; left: 0; right: 0; overflow-y: auto; overflow-x: hidden; padding: 0 94px 32px; scrollbar-color: #5e5e5a #151515; scrollbar-width: thin; }
+.home-feature { position: relative; height: 365px; margin-bottom: 32px; }
+.home-image { position: absolute; top: 0; right: -94px; width: 1200px; height: 365px; background-position: center 36%; background-size: cover; }
+.home-image:after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(90deg,#151515 5%,rgba(21,21,21,.35) 78%),linear-gradient(0deg,#151515,transparent 55%); }
+.home-copy { position: relative; padding-top: 12px; max-width: 850px; }
+.home-kicker { font-size: 17px; letter-spacing: 2px; color: #bdbdb7; margin-bottom: 15px; }
+.home-copy h1 { font-size: 69px; line-height: 1.05; letter-spacing: -1.5px; max-height: 146px; overflow: hidden; margin: 0 0 12px; }
+.home-meta { font-size: 20px; color: #e8e8e3; }
+.home-copy p { font-size: 23px; line-height: 1.4; color: #deded8; max-width: 700px; max-height: 65px; overflow: hidden; margin: 16px 0 22px; }
+.home-copy .button { min-height: 62px; padding: 16px 26px; font-size: 24px; }
+.home-notice { background: #222222; border-left: 3px solid #787872; padding: 17px 22px; margin: 0 0 28px; font-size: 21px; line-height: 1.4; color: #deded8; }
+.home-shelf { margin-bottom: 36px; }
+.home-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 17px; padding-right: 8px; }
+.home-heading h2 { font-size: 29px; font-weight: 400; margin: 0; }
+.home-heading span { font-size: 19px; color: #bdbdb7; margin-left: 24px; }
+.home-track { display: flex; overflow-x: auto; overflow-y: hidden; padding: 10px 8px 14px; margin-left: -8px; scrollbar-width: none; }
+.home-track::-webkit-scrollbar { display: none; }
+.home-film { display: block; flex-shrink: 0; text-align: left; padding: 0; width: 272px; border-radius: 11px; margin-right: 22px; background: transparent; }
+.home-film-art { display: block; position: relative; width: 100%; height: 156px; border-radius: 11px; background-size: cover; background-position: center; background-color: #2e2e2e; }
+.home-film-art img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; border-radius: 11px; }
+.home-film-initial { display: block; font: 68px/156px Georgia, serif; text-align: center; color: #bdbdb7; }
+.home-film-name { display: block; font-size: 23px; line-height: 1.2; margin-top: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-film-meta { display: block; font-size: 19px; color: #bdbdb7; margin-top: 7px; }
+.home-film.focused, .home-film:focus { outline: none; }
+.home-film.focused .home-film-art, .home-film:focus .home-film-art, .home-film:hover .home-film-art { outline: 4px solid #ffffff; outline-offset: 5px; }
+.home-film.focused .home-film-name { color: #ffffff; }
+.home-progress { position: absolute; left: 0; bottom: 0; width: 100%; height: 5px; background: #5e5e5a; }
+.home-progress i { display: block; height: 5px; background: #ffffff; }
+.home-badge { position: absolute; top: 12px; right: 12px; padding: 6px 9px; font-size: 16px; background: #242424; color: #f5f5f1; border-radius: 4px; }
+.home-pages { display: flex; align-items: center; margin: 8px 0 0; }
+.home-pages span { color: #bdbdb7; font-size: 19px; margin: 0 22px; }
+.home-pages .button { min-height: 48px; font-size: 20px; padding: 10px 19px; margin-right: 14px; }
+.home-empty { border: 1px solid #414141; border-radius: 11px; padding: 25px 28px; margin: 10px 0 30px; }
+.home-empty h2 { font-size: 28px; font-weight: 400; margin: 0 0 13px; }
+.home-empty p { font-size: 22px; color: #bdbdb7; margin: 0 0 22px; }
+.home-empty .button { min-height: 56px; font-size: 22px; padding: 14px 22px; }
+.home-sample-actions { display: flex; align-items: center; margin-top: 18px; }
+.home-sample-actions .button { font-size: 22px; min-height: 58px; padding: 14px 22px; }
+.home-sample-actions .resume-note { margin: 0 0 0 14px; }
+.home-credits { border-top: 1px solid #353533; padding: 30px 0 8px; color: #bdbdb7; font-size: 18px; }
+.home-credits img { width: 130px; }
+.home-credits p { margin: 16px 0 22px; }

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#151515">
+  <title>Account manager | Vizio Media</title>
+  <link rel="icon" href="/static/art/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/manage.css?v=2">
+</head>
+<body>
+  <header class="manager-header"><a class="brand" href="/"><img src="/static/art/mark.svg" width="36" height="36" alt="">Vizio Media</a><span>Account manager</span><button id="sign-out" data-action="logout" hidden>Sign out</button></header>
+  <main>
+    <div id="message" role="status" class="message" hidden></div>
+    <section id="auth" class="auth-panel"><h1 id="auth-title">Account manager</h1><p id="auth-copy">Checking this installation...</p><form id="auth-form" hidden><label for="owner-password">Owner password</label><input id="owner-password" name="password" type="password" maxlength="128" autocomplete="current-password" required><button id="auth-submit" class="primary" type="submit">Sign in</button></form><p class="muted">This page opens only on the server computer. Application credentials stay on this computer.</p></section>
+    <div id="dashboard" hidden>
+      <div class="page-heading"><div><h1>Your household</h1><p>Give each viewer their own service accounts and saved progress.</p></div><a href="/" class="text-link">Open TV view</a></div>
+      <nav class="tabs" aria-label="Account manager"><button id="tab-profiles" data-action="tab" data-value="profiles" aria-current="page">Profiles and accounts</button><button id="tab-settings" data-action="tab" data-value="settings">Service setup</button><button id="tab-credits" data-action="tab" data-value="credits">Credits</button></nav>
+      <section id="panel-profiles">
+        <div class="profile-layout"><aside><h2>Profiles</h2><div id="profile-list"></div><form id="create-profile" class="stack-form"><h3>Add a profile</h3><label for="new-name">Name</label><input id="new-name" maxlength="32" required autocomplete="off"><label for="new-pin">PIN, optional</label><input id="new-pin" type="password" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" autocomplete="new-password" aria-describedby="new-pin-help"><small id="new-pin-help">Four to eight digits. A PIN limits access on shared TVs.</small><button type="submit">Add profile</button></form></aside><div><div id="profile-detail"></div><section id="device-panel" class="device-panel" aria-live="polite" hidden></section></div></div>
+      </section>
+      <section id="panel-settings" hidden>
+        <p class="section-intro">Set up the applications once, then connect accounts for each profile. Saved values are never shown again. Leave a field blank to keep its current value.</p>
+        <section class="setup-section"><div><h2>TMDB catalog</h2><p>Movie and series search, posters, seasons, and episode details.</p><p id="config-tmdb" class="state">Checking setup...</p><a class="text-link" href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">Get an API Read Access Token</a></div><form id="setup-tmdb" class="stack-form"><label for="tmdb-token">API Read Access Token</label><input id="tmdb-token" name="read_token" type="password" autocomplete="off" maxlength="2048"><div class="form-actions"><button type="submit" class="primary">Save TMDB setup</button><button type="button" data-action="remove-config" data-value="tmdb">Remove setup</button></div></form></section>
+        <section class="setup-section"><div><h2>Trakt application</h2><p>Catalog fallback and personal watchlists. Connect each profile with a device code.</p><p id="config-trakt" class="state">Checking setup...</p><a class="text-link" href="https://trakt.tv/oauth/applications" target="_blank" rel="noopener noreferrer">Register a Trakt application</a></div><form id="setup-trakt" class="stack-form"><label for="trakt-id">Client ID</label><input id="trakt-id" name="client_id" type="password" autocomplete="off" maxlength="256"><label for="trakt-secret">Client secret, if required by your application</label><input id="trakt-secret" name="client_secret" type="password" autocomplete="off" maxlength="2048"><label for="trakt-redirect">Registered redirect URI</label><input id="trakt-redirect" name="redirect_uri" placeholder="urn:ietf:wg:oauth:2.0:oob" autocomplete="off" maxlength="500"><small>Use the same URI registered with Trakt. The value above is the default.</small><div class="form-actions"><button type="submit" class="primary">Save Trakt setup</button><button type="button" data-action="remove-config" data-value="trakt">Remove setup</button></div></form></section>
+        <section class="setup-section"><div><h2>Real-Debrid application</h2><p>Device-code login requires a registered application client ID. For this private installation, you can instead enter a personal token under Profiles and accounts.</p><p id="config-real_debrid" class="state">Checking setup...</p><a class="text-link" href="https://api.real-debrid.com/" target="_blank" rel="noopener noreferrer">Real-Debrid API documentation</a></div><form id="setup-real_debrid" class="stack-form"><label for="rd-id">Application client ID</label><input id="rd-id" name="client_id" type="password" autocomplete="off" maxlength="256"><div class="form-actions"><button type="submit" class="primary">Save Real-Debrid setup</button><button type="button" data-action="remove-config" data-value="real_debrid">Remove setup</button></div></form></section>
+      </section>
+      <section id="panel-credits" class="credits" hidden><h2>Credits</h2><a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer"><img class="tmdb-logo" src="/static/art/tmdb.svg" alt="TMDB"></a><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p><p><a href="https://trakt.tv" target="_blank" rel="noopener noreferrer">Trakt</a> supplies catalog metadata and personal watchlists. <a href="https://real-debrid.com" target="_blank" rel="noopener noreferrer">Real-Debrid</a> supplies account file listings when connected.</p><p>FenLight+ is a reference for browsing and provider design. This is an independent implementation.</p><p>Big Buck Bunny trailer: &copy; 2008 Blender Foundation / <a href="https://www.bigbuckbunny.org" target="_blank" rel="noopener noreferrer">www.bigbuckbunny.org</a>, used under <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 3.0</a>. Sample-card illustrations are original.</p><p>Vizio Media is an independent home project.</p></section>
+    </div>
+  </main>
+  <footer>Private household installation. Back up data/vault.key together with data/vizio-media.sqlite3 to preserve linked accounts.</footer>
+  <script src="/static/service-link.js?v=1"></script>
+  <script src="/static/manage.js?v=1"></script>
+</body>
+</html>
