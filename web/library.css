@@ -64,3 +64,17 @@
 .source-warning, .dialog-panel .source-warning { color: #f1d8a6; }
 .dialog-panel .ready-filename { font-size: 24px; overflow-wrap: break-word; max-height: 160px; overflow: auto; }
 .dialog-panel .prepare-progress { font: 64px Georgia, serif; color: #ffffff; }
+.loading-state { display: flex; align-items: center; min-height: 150px; padding: 18px 0; }
+.loading-spinner { display: block; flex-shrink: 0; width: 44px; height: 44px; margin-right: 24px; border: 4px solid #555555; border-top-color: #ffffff; border-radius: 50%; animation: source-loading 0.9s linear infinite; }
+.dialog-panel .loading-state p { margin: 0; }
+.dialog-panel .loading-state .loading-note { margin-top: 12px; font-size: 21px; color: #bdbdb7; }
+@keyframes source-loading { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .loading-spinner { animation: none; border-style: dotted; } }
+.source-best { display: flex; align-items: center; margin-bottom: 22px; }
+.source-best > span { font-size: 20px; color: #bdbdb7; margin-left: 24px; }
+.source-pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+.source-pagination > span { font-size: 22px; color: #bdbdb7; }
+.source-pagination button:disabled { opacity: 0.45; }
+.dialog-panel .source-navigation { margin: 20px 0 0; }
+.recommended-source { font-size: 18px; font-weight: 400; color: #ffffff; margin-right: 10px; }
+.dialog-panel .attempt-filename { font-size: 23px; max-height: 100px; overflow: hidden; overflow-wrap: break-word; }

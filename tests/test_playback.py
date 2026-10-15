@@ -60,8 +60,9 @@ def test_source_search_deduplicates_and_never_submits_or_exposes_private_links(p
     client, cloud, app, _ = playback_env
     result = sources(client)
     assert len(result["items"]) == 2
-    assert result["items"][0]["provider"] == "real_debrid_library"
-    assert result["items"][1]["preferred"]
+    assert result["items"][0]["provider"] == "cocoscrapers"
+    assert result["items"][0]["preferred"] and result["items"][0]["recommended"]
+    assert not result["items"][1].get("recommended")
     assert cloud.added == 0 and cloud.unrestricts == 0
     assert "magnet:" not in json.dumps(result)
     assert "private-download" not in json.dumps(result)
@@ -156,7 +157,7 @@ def test_expired_choice_disconnect_and_failed_torrent_have_actionable_errors(pla
 def test_download_link_is_refreshed_after_cdn_expiry(playback_env):
     client, cloud, app, media = playback_env
     result = sources(client)
-    item = result["items"][0]
+    item = next(item for item in result["items"] if item["provider"] == "real_debrid_library")
     response = client.post("/api/playback", json={"selection_id": item["selection_id"]}, headers=WRITE)
     assert response.status_code == 200, response.text
     playing = response.json()

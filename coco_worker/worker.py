@@ -6,6 +6,7 @@ Kodi UI/settings/storage helpers are replaced with local compatibility modules.
 """
 
 import importlib
+from itertools import zip_longest
 import json
 import os
 from pathlib import Path
@@ -21,7 +22,10 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 
 ARCHIVE = Path(__file__).resolve().parents[1] / "vendor" / "cocoscrapers-1.0.32.zip"
-PROVIDERS = ("torrentio", "bitsearch", "eztv")
+CATALOG = json.loads(Path(__file__).with_name("providers.json").read_text(encoding="utf-8"))
+PROVIDERS = {item["id"] for item in CATALOG}
+DEFAULT_PROVIDERS = [item["id"] for item in CATALOG if item.get("default")]
+IMDB_PROVIDERS = {item["id"] for item in CATALOG if item.get("imdb")}
 _local = threading.local()
 
 
@@ -121,17 +125,17 @@ def run_search(payload, request=None):
     episodic = payload.get("episode") is not None
     if episodic:
         data.update(tvshowtitle=title["title"], season=str(payload["season"]), episode=str(payload["episode"]))
-    requested = [name for name in payload.get("providers", PROVIDERS) if name in PROVIDERS]
+    requested = list(dict.fromkeys(name for name in payload.get("providers", DEFAULT_PROVIDERS) if name in PROVIDERS))
     results = queue.Queue()
 
     def scrape(name):
         _local.failed = False
         try:
             provider = importlib.import_module("cocoscrapers.sources_cocoscrapers.torrents." + name).source()
-            if not episodic and not provider.hasMovies:
+            if (episodic and not provider.hasEpisodes) or (not episodic and not provider.hasMovies):
                 results.put((name, [], "skipped"))
                 return
-            if name == "torrentio" and not data["imdb"]:
+            if name in IMDB_PROVIDERS and not data["imdb"]:
                 results.put((name, [], "missing_imdb"))
                 return
             items = provider.sources(dict(data), {}) or []
@@ -142,19 +146,22 @@ def run_search(payload, request=None):
     for name in requested:
         threading.Thread(target=scrape, args=(name,), daemon=True).start()
     deadline = time.monotonic() + 18
-    found, statuses = [], {}
+    batches, statuses = {}, {}
     while len(statuses) < len(requested) and time.monotonic() < deadline:
         try:
             name, items, status = results.get(timeout=max(.01, deadline - time.monotonic()))
             statuses[name] = status
-            found.extend(items)
+            batches[name] = items
         except queue.Empty:
             break
     for name in requested:
         statuses.setdefault(name, "timeout")
+    # Keep a share of the bounded result set for every enabled provider.
+    found = [item for row in zip_longest(*(batches.get(name, []) for name in requested))
+             for item in row if item is not None]
     normalized = [{"name": str(item.get("name", ""))[:500], "hash": str(item.get("hash", ""))[:80],
                    "provider": str(item.get("provider", ""))[:40], "quality": str(item.get("quality", ""))[:20],
-                   "size": item.get("size", 0)} for item in found[:500] if isinstance(item, dict)]
+                   "size": item.get("size", 0), "seeders": item.get("seeders", 0)} for item in found[:500] if isinstance(item, dict)]
     return {"items": normalized, "providers": statuses}
 
 

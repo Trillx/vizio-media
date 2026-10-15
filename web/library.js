@@ -9,6 +9,7 @@
     var flowService = '', flowTick = null, activeFlow = null;
     var names = {trakt: 'Trakt', real_debrid: 'Real-Debrid'};
     var playbackState = null, playbackTimer = null, playbackStarted = 0, fileOffset = 0;
+    var automatic = null, SOURCE_PAGE_SIZE = 3;
     function button(id, label, action, value, classes) {
         return '<button id="' + id + '" class="button ' + (classes || 'secondary') + '" data-action="' + action + '"' +
             (value === undefined ? '' : ' data-value="' + esc(value) + '"') + '>' + esc(label) + '</button>';
@@ -17,9 +18,14 @@
         view = next; $('dialog').setAttribute('data-extra', next); A.open(heading, html, rows, focus);
     }
     function fail(data) { return esc((data && data.detail) || 'The server could not complete this request. Try again.'); }
+    function loading(message, note) {
+        return '<div class="loading-state" role="status"><span class="loading-spinner" aria-hidden="true"></span><div><p>' + esc(message) + '</p>' + (note ? '<p class="loading-note">' + esc(note) + '</p>' : '') + '</div></div>';
+    }
+    function cancelAutomatic() { if (automatic) { automatic.cancel(); automatic = null; } }
     function load(next, heading, path, callback, timeout) {
+        cancelAutomatic();
         var current = ++ticket;
-        open(next, heading, '<p role="status">Loading...</p>', [], 'dialog-close');
+        open(next, heading, loading('Loading...'), [], 'dialog-close');
         req('GET', path, null, function (ok, data) {
             if (current !== ticket || view !== next) { return; }
             if (!ok) {
@@ -103,7 +109,7 @@
         load('detail', 'Title details', '/api/catalog/' + encodeURIComponent(id), function (data) { title = data; renderDetail(); });
     }
     function renderDetail() {
-        var ids = ['catalog-files'], actions = button('catalog-files', 'Find sources', 'catalog-sources', undefined, 'primary');
+        var ids = ['catalog-best', 'catalog-files'], actions = button('catalog-best', 'Play best available', 'catalog-best', undefined, 'primary') + button('catalog-files', 'Find sources', 'catalog-sources');
         if (title.kind === 'tv') { ids = ['catalog-seasons']; actions = button('catalog-seasons', 'Seasons and episodes', 'catalog-seasons', undefined, 'primary'); }
         if (title.playable) { ids.unshift('catalog-play'); actions = button('catalog-play', 'Play local trailer', 'catalog-play', undefined, 'primary') + actions; }
         var html = '<div class="film-details">' + (title.poster ? '<img class="detail-poster" src="' + esc(title.poster) + '" alt="">' : '') + '<div class="detail-copy"><p class="detail-meta">' + esc(title.year || 'Year unknown') + ' / ' + (title.kind === 'tv' ? 'Series' : 'Movie') + (title.runtime ? ' / ' + esc(title.runtime) + ' min' : '') + '</p>' +
@@ -127,28 +133,81 @@
     function renderSeasons() { pagedList('seasons', title.title, title.seasons || [], 'catalog-season', function (s) { return s.name + ' / ' + s.episode_count + ' episodes'; }); }
     function renderEpisodes() { pagedList('episodes', season.name, season.episodes, 'catalog-episode', function (e) { return e.number + '. ' + e.name; }); }
     function renderEpisode() {
-        open('episode', episode.number + '. ' + episode.name, '<p class="detail-meta">' + esc(title.title) + ' / Season ' + season.number + '</p><p class="catalog-overview">' + esc(episode.overview) + '</p>' + button('episode-files', 'Find episode sources', 'catalog-sources', undefined, 'primary'), [['episode-files']], 'episode-files');
+        open('episode', episode.number + '. ' + episode.name, '<p class="detail-meta">' + esc(title.title) + ' / Season ' + season.number + '</p><p class="catalog-overview">' + esc(episode.overview) + '</p>' + button('episode-best', 'Play best available', 'catalog-best', undefined, 'primary') + button('episode-files', 'Find episode sources', 'catalog-sources'), [['episode-best','episode-files']], 'episode-best');
     }
-    function sources() {
+    function sources(playBest) {
         var suffix = '?discover=true' + (episode ? '&season=' + season.number + '&episode=' + episode.number : '');
         sourceOffset = 0;
-        load('sources', 'Find sources', '/api/catalog/' + encodeURIComponent(title.id) + '/sources' + suffix, function (data) { sourceResult = data; renderSources(); }, 60000);
-        $('dialog-content').innerHTML = '<p role="status">Searching CocoScrapers and your Real-Debrid files. This can take up to 30 seconds.</p>' + button('source-cancel', 'Back to title', 'extra-back');
+        load('sources', 'Find sources', '/api/catalog/' + encodeURIComponent(title.id) + '/sources' + suffix, function (data) {
+            sourceResult = data; renderSources();
+            if (playBest && data.items.length) { startAutomatic(); }
+        }, 60000);
+        $('dialog-content').innerHTML = loading('Searching for sources...', 'Checking your enabled providers and Real-Debrid files. This can take up to 30 seconds.') + button('source-cancel', 'Back to title', 'extra-back');
         A.open('Find sources', $('dialog-content').innerHTML, [['source-cancel']], 'source-cancel');
     }
     function sizeLabel(bytes) { return bytes ? (bytes / 1073741824).toFixed(2) + ' GB' : 'Size unknown'; }
-    function renderSources() {
-        var items = sourceResult.items.slice(sourceOffset, sourceOffset + 4), html = '<p class="catalog-note source-notice">' + esc(sourceResult.notice) + '</p>', i, rows = [];
+    function renderSources(preferred) {
+        var items = sourceResult.items.slice(sourceOffset, sourceOffset + SOURCE_PAGE_SIZE), html = '<p class="catalog-note source-notice">' + esc(sourceResult.notice) + '</p>', i, rows = [];
+        if (sourceResult.items.length) {
+            html += '<div class="source-best">' + button('sources-best', 'Play best available', 'sources-best', undefined, 'primary compact') + '<span>Tries the recommended sources until one plays</span></div>';
+            rows.push(['sources-best']);
+        }
         for (i = 0; i < items.length; i += 1) {
             var item = items[i], id = 'source-' + i;
-            html += '<button id="' + id + '" class="source-item source-choice" data-action="source-choose" data-value="' + (sourceOffset + i) + '"><span>' + esc(item.filename) + '</span><small>' + esc(item.quality) + ' / ' + sizeLabel(item.size) + ' / ' + (item.provider === 'real_debrid_library' ? 'In your account / ' + esc(item.status) : 'CocoScrapers / ' + esc(item.scraper || 'Provider')) + (item.preferred ? ' / H.264 preferred' : '') + '</small>' + (item.warning ? '<small class="source-warning">' + esc(item.warning) + '</small>' : '') + '</button>';
+            html += '<button id="' + id + '" class="source-item source-choice" data-action="source-choose" data-value="' + (sourceOffset + i) + '"><span>' + (item.recommended ? '<b class="recommended-source">Recommended</b> ' : '') + esc(item.filename) + '</span><small>' + esc(item.quality) + ' / ' + sizeLabel(item.size) + ' / ' + (item.provider === 'real_debrid_library' ? 'In your account / ' + esc(item.status) : 'CocoScrapers / ' + esc(item.scraper || 'Provider')) + (item.preferred ? ' / H.264 preferred' : '') + '</small>' + (item.warning ? '<small class="source-warning">' + esc(item.warning) + '</small>' : '') + '</button>';
             rows.push([id]);
         }
         if (!items.length) { html += '<p>No matching sources were returned. Try again later or check your Real-Debrid account.</p>'; }
-        var ids = ['source-back', 'sources-retry']; html += '<div class="dialog-actions">' + button('source-back', 'Back to title', 'extra-back') + button('sources-retry', 'Search again', 'catalog-sources');
-        if (sourceOffset > 0) { html += button('sources-prev', 'Previous', 'sources-prev'); ids.push('sources-prev'); }
-        if (sourceOffset + 4 < sourceResult.items.length) { html += button('sources-next', 'Next', 'sources-next'); ids.push('sources-next'); }
-        html += '</div>'; rows.push(ids); open('sources', title.title + ' / Sources', html, rows, items.length ? 'source-0' : 'sources-retry');
+        var page = Math.floor(sourceOffset / SOURCE_PAGE_SIZE) + 1, total = Math.max(1, Math.ceil(sourceResult.items.length / SOURCE_PAGE_SIZE));
+        var pages = [];
+        html += '<div class="source-pagination">';
+        if (sourceOffset > 0) { html += button('sources-prev', 'Previous page', 'sources-prev', undefined, 'secondary compact'); pages.push('sources-prev'); }
+        else { html += '<button class="button secondary compact" disabled>Previous page</button>'; }
+        html += '<span id="source-page-status" role="status">Page ' + page + ' of ' + total + '</span>';
+        if (page < total) { html += button('sources-next', 'Next page', 'sources-next', undefined, 'secondary compact'); pages.push('sources-next'); }
+        else { html += '<button class="button secondary compact" disabled>Next page</button>'; }
+        html += '</div>';
+        if (pages.length) { rows.push(pages); }
+        html += '<div class="dialog-actions source-navigation">' + button('source-back', 'Back to title', 'extra-back', undefined, 'secondary compact') + button('sources-retry', 'Search again', 'catalog-sources', undefined, 'secondary compact') + '</div>';
+        rows.push(['source-back','sources-retry']);
+        var focus = preferred || (items.length ? 'sources-best' : 'sources-retry');
+        if (preferred === 'sources-next' || preferred === 'sources-prev') { focus = pages.indexOf(preferred) !== -1 ? preferred : pages[0] || 'source-back'; }
+        if (/^source-[0-9]+$/.test(focus)) { focus = 'source-' + Math.min(Number(focus.slice(7)), items.length - 1); }
+        open('sources', title.title + ' / Sources', html, rows, focus);
+    }
+    function pageSources(direction, focus) {
+        var next = sourceOffset + direction * SOURCE_PAGE_SIZE;
+        if (next < 0 || next >= sourceResult.items.length) { return; }
+        sourceOffset = next; renderSources(focus);
+    }
+    function startAutomatic() {
+        cancelAutomatic(); ticket += 1; clearTimeout(playbackTimer);
+        var controller;
+        controller = window.VizioAutoPlay.create({
+            request: req,
+            stop: function (id) { req('DELETE', '/api/playback/' + encodeURIComponent(id), {}, null); },
+            stopVideo: function () { A.stopStreamAttempt(); },
+            play: function (media, hooks) { A.playStream(media, false, function () { cancelAutomatic(); renderSources(); }, hooks); },
+            state: function (state) {
+                if (automatic !== controller) { return; }
+                if (state.state === 'playing') { view = 'autoplay-playing'; return; }
+                if (state.state === 'blocked') {
+                    A.stopStreamAttempt();
+                    open('autoplay', 'Ready to play', '<p>The TV needs a button press to start this video.</p>' + button('auto-resume', 'Play video', 'auto-resume', undefined, 'primary') + button('auto-cancel', 'Back to sources', 'auto-cancel'), [['auto-resume','auto-cancel']], 'auto-resume'); return;
+                }
+                if (state.state === 'exhausted') {
+                    open('autoplay', 'Choose a source', '<p class="error-message" role="alert">' + esc(state.details.message) + '</p>' + button('auto-cancel', 'Choose a source', 'auto-cancel', undefined, 'primary') + button('auto-again', 'Search again', 'catalog-best'), [['auto-cancel','auto-again']], 'auto-cancel'); return;
+                }
+                if (state.state === 'starting') { return; }
+                var progress = state.details.progress;
+                open('autoplay', 'Trying source ' + (state.index + 1) + ' of ' + state.count,
+                    loading('Finding a source that plays...', state.details.reason || 'Sources that fail or take too long are skipped automatically.') +
+                    '<p class="attempt-filename">' + esc(state.source.filename) + '</p>' +
+                    (typeof progress === 'number' ? '<p class="catalog-note">Real-Debrid preparation: ' + Math.round(progress) + '%</p>' : '') +
+                    '<div class="dialog-actions">' + button('auto-next', 'Try next source', 'auto-next') + button('auto-cancel', 'Cancel', 'auto-cancel') + '</div>', [['auto-next','auto-cancel']], 'auto-cancel');
+            }
+        });
+        automatic = controller; controller.start(sourceResult.items);
     }
     function preparationError(data) {
         clearTimeout(playbackTimer);
@@ -167,7 +226,7 @@
             open('prepare', data.title, html, [ids], 'playback-play'); return;
         }
         if (data.state === 'files') { renderFiles(); return; }
-        open('prepare', 'Preparing your video', '<p id="preparation-message" role="status">' + esc(data.message) + '</p><p class="prepare-progress">' + Math.round(data.progress || 0) + '%</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+        open('prepare', 'Preparing your video', loading(data.message || 'Preparing your video...') + '<p class="prepare-progress">' + Math.round(data.progress || 0) + '%</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
         if (new Date().getTime() - playbackStarted > 5 * 60000) {
             preparationError({detail:'This source is still downloading in Real-Debrid. Choose another source or try it again later.'}); return;
         }
@@ -192,9 +251,10 @@
         html += '</div>'; rows.push(ids); open('prepare', 'Choose a video file', html, rows, files.length ? 'playback-file-0' : 'playback-back');
     }
     function prepareSource(index) {
+        cancelAutomatic();
         var source = sourceResult.items[index], current = ++ticket;
         clearTimeout(playbackTimer); playbackState = null; fileOffset = 0; playbackStarted = new Date().getTime();
-        open('prepare', 'Preparing your video', '<p role="status">Checking this source with Real-Debrid...</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+        open('prepare', 'Preparing your video', loading('Checking this source with Real-Debrid...') + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
         req('POST', '/api/playback', {selection_id:source.selection_id}, function (ok, data) {
             if (current !== ticket || view !== 'prepare') { return; }
             if (ok) { showPreparation(data); } else { preparationError(data); }
@@ -274,6 +334,7 @@
     function back() {
         ticket += 1;
         clearTimeout(playbackTimer);
+        if (view === 'autoplay' || view === 'autoplay-playing') { cancelAutomatic(); renderSources(); return true; }
         if (view === 'prepare') { renderSources(); return true; }
         if (view === 'detail') { if (detailOrigin === 'home') { A.close(); } else { renderSearch('result-0'); } return true; }
         if (view === 'seasons') { renderDetail(); return true; }
@@ -303,10 +364,15 @@
                 });
             });
         },
-        dismiss: function () { ticket += 1; view = ''; $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); clearTimeout(playbackTimer); activeFlow = null; },
+        dismiss: function () { cancelAutomatic(); ticket += 1; view = ''; $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); clearTimeout(playbackTimer); activeFlow = null; },
         back: back,
         key: function (event, action) {
             var input = document.activeElement;
+            if (view === 'sources' && input && /^source-[0-9]+$/.test(input.id) && (action === 'left' || action === 'right')) {
+                event.preventDefault(); event.stopPropagation();
+                if (!event.repeat) { pageSources(action === 'right' ? 1 : -1, input.id); }
+                return true;
+            }
             if (input && input.id === 'catalog-overview' && (action === 'up' || action === 'down')) {
                 var direction = action === 'down' ? 1 : -1, before = input.scrollTop;
                 input.scrollTop += direction * 100;
@@ -339,19 +405,24 @@
             if (action === 'catalog-episode') { episode = season.episodes[Number(value)]; renderEpisode(); }
             if (action === 'list-prev' || action === 'list-next') { listOffset = Math.max(0, listOffset + (action === 'list-next' ? 6 : -6)); if (view === 'seasons') { renderSeasons(); } else { renderEpisodes(); } }
             if (action === 'catalog-sources') { sources(); }
+            if (action === 'catalog-best') { sources(true); }
+            if (action === 'sources-best') { startAutomatic(); }
+            if (action === 'auto-next' && automatic) { automatic.next(); }
+            if (action === 'auto-resume' && automatic) { automatic.resume(); }
+            if (action === 'auto-cancel') { cancelAutomatic(); renderSources(); }
             if (action === 'source-choose') { prepareSource(Number(value)); }
             if (action === 'playback-back') { ticket += 1; clearTimeout(playbackTimer); renderSources(); }
             if (action === 'playback-play') { clearTimeout(playbackTimer); A.playStream(playbackState, value === 'restart', function () { renderSources(); }); }
             if (action === 'files-prev' || action === 'files-next') { fileOffset = Math.max(0, fileOffset + (action === 'files-next' ? 4 : -4)); renderFiles(); }
             if (action === 'playback-file') {
                 var current = ++ticket, sessionId = playbackState.id;
-                open('prepare', 'Preparing your video', '<p role="status">Selecting the video file...</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+                open('prepare', 'Preparing your video', loading('Selecting the video file...') + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
                 req('POST', '/api/playback/' + encodeURIComponent(sessionId) + '/files', {file_id:Number(value)}, function (ok, data) {
                     if (view !== 'prepare' || current !== ticket) { return; }
                     if (ok) { showPreparation(data); } else { preparationError(data); }
                 }, 60000);
             }
-            if (action === 'sources-prev' || action === 'sources-next') { sourceOffset = Math.max(0, sourceOffset + (action === 'sources-next' ? 4 : -4)); renderSources(); }
+            if (action === 'sources-prev' || action === 'sources-next') { pageSources(action === 'sources-next' ? 1 : -1, action); }
             if (action === 'accounts') { accounts(); }
             if (action === 'account-link') { flowService = value; view = 'link'; activeFlow = null; clearInterval(flowTick); flowTick = setInterval(updateCountdown, 1000); linker.start(value); }
             if (action === 'account-cancel') { linker.cancel(); clearInterval(flowTick); accounts(); }
@@ -368,7 +439,7 @@
         }
     };
     document.addEventListener('click', function (event) { if (event.target.tagName === 'INPUT') { A.focus(event.target.id); } }, false);
-    window.addEventListener('pagehide', function () { linker.stop(); clearInterval(flowTick); }, false);
+    window.addEventListener('pagehide', function () { cancelAutomatic(); linker.stop(); clearInterval(flowTick); }, false);
     refreshMe(function (ok) {
         if (!ok || me.profile) { return; }
         req('GET', '/api/profiles', null, function (good, data) {

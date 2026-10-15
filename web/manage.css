@@ -89,3 +89,10 @@ footer { border-top: 1px solid #414141; padding: 24px 5%; color: #bdbdb7; font-s
   .setup-section form { margin-top: 22px; }
   .auth-panel { margin: 28px auto; }
 }
+/* Source controls follow the existing account-manager typography and spacing. */
+#provider-options { border: 1px solid #5e5e5a; border-radius: 8px; padding: 16px; margin: 0 0 16px; }
+#provider-options legend { padding: 0 8px; }
+.provider-option { display: flex; align-items: center; gap: 14px; padding: 10px 0; cursor: pointer; }
+.provider-option input[type="checkbox"] { width: 22px; height: 22px; margin: 0; flex-shrink: 0; accent-color: #f5f5f1; }
+.provider-option strong { font-weight: 500; }
+.provider-option small { display: block; margin-top: 3px; }

@@ -19,6 +19,7 @@
 !media/ATTRIBUTION.md
 !coco_worker/
 !coco_worker/worker.py
+!coco_worker/providers.json
 !coco_worker/README.md
 !vendor/
 !vendor/cocoscrapers-1.0.32.zip

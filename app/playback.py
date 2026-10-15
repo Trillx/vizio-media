@@ -35,14 +35,35 @@ def format_hint(filename):
     quality = next((label for pattern, label in ((r"2160|4[ ._-]?k", "4K"), (r"1080", "1080p"), (r"720", "720p"))
                     if re.search(pattern, name)), "Unknown")
     warnings = []
-    if re.search(r"hevc|[xh][ ._-]?265|10bit|10.bit|dolby.vision|\bdovi\b|\bdv\b", name):
+    if re.search(r"hevc|[xh][ ._-]?265|10bit|10.bit|dolby[ ._-]?vision|hdr|\bdovi\b|\bdv\b", name):
         warnings.append("HEVC, HDR, or 10-bit video may not play on this TV")
     if re.search(r"dts|truehd|atmos", name):
         warnings.append("Audio may be unsupported")
     if PurePosixPath(name).suffix in {".mkv", ".avi", ".ts"}:
         warnings.append("Container support depends on the TV")
     preferred = bool(re.search(r"[xh][ ._-]?264|avc", name) and not warnings)
-    return {"quality": quality, "warning": ". ".join(warnings), "preferred": preferred}
+    return {"quality": quality, "warning": ". ".join(warnings), "preferred": preferred,
+            "aac": bool(re.search(r"\baac\b", name))}
+
+
+def source_rank(item):
+    """Prefer the TV's verified formats before readiness, resolution, and size."""
+    ready = item.get("provider") == "real_debrid_library" and item.get("status") in {"downloaded", "account download"}
+    return (bool(item.get("warning")), not item.get("preferred", False), not item.get("aac", False), not ready,
+            {"1080p":0,"720p":1,"Unknown":2,"4K":3}.get(item.get("quality"), 2),
+            item.get("size") or 10**15, item.get("filename", "").casefold())
+
+
+def recommended_file(files, choice):
+    matching=[item for item in files[:100] if playable_file(item)
+              and not re.search(r"(?:^|[/ ._-])(?:extras?|featurettes?|bonus|behind[ ._-]the[ ._-]scenes)(?:[/ ._-]|$)",
+                                str(item.get("path", "")), re.I)
+              and match_score(str(item.get("path", "")), choice.title, choice.season, choice.episode) >= .85]
+    if not matching:
+        return None
+    ranked=sorted(matching,key=lambda item:source_rank({"filename":str(item.get("path","")),
+        "size":-(item.get("bytes") or 0),**format_hint(str(item.get("path","")))}))
+    return ranked[0]["id"]
 
 
 def playable_file(item):
@@ -110,7 +131,7 @@ class Viewing:
 class Playback:
     def __init__(self, services, store, *, coco=None, transport=None):
         self.services, self.store = services, store
-        self.coco = coco or CocoProvider()
+        self.coco = coco or CocoProvider(lambda: self.services.config("cocoscrapers"))
         self.choices, self.viewings = {}, {}
         self.lock = threading.RLock()
         self.searching = set()
@@ -174,9 +195,7 @@ class Playback:
                     except (ServiceError, ValueError, TypeError) as error:
                         notices.append(error.message if isinstance(error, ServiceError) else "Some source results could not be read.")
             items = [{**item, **format_hint(item["filename"])} for item in items]
-            items.sort(key=lambda item: (0 if item["provider"] == "real_debrid_library" and item.get("status") in {"downloaded", "account download"} else 1,
-                not item["preferred"],
-                bool(item["warning"]), {"1080p": 0, "720p": 1, "4K": 2}.get(item["quality"], 3)))
+            items.sort(key=source_rank)
             with self.lock:
                 self.prune()
                 if len(self.choices) > 1000:
@@ -186,6 +205,8 @@ class Playback:
                     self.choices[token] = Choice(profile, owner, title, season, episode, dict(item))
                     item["selection_id"] = token
                     item.pop("hash", None)
+                if items:
+                    items[0]["recommended"] = True
             return {"items": items[:100], "provider": "cocoscrapers" if discover else "real_debrid_library",
                 "providers": providers, "notice": " ".join(notices) or
                 ("Choose a source to prepare it in Real-Debrid. H.264 with AAC is the safest starting point for this TV." if discover
@@ -286,6 +307,7 @@ class Playback:
                     viewing.result = {"id": session, "state": "files", "files": [
                         {"id": int(item["id"]), "filename": str(item.get("path", ""))[:500],
                          "size": item.get("bytes", 0), **format_hint(str(item.get("path", "")))} for item in available[:100]],
+                        "recommended_file_id": recommended_file(available, viewing.choice),
                         "message": "Choose the video file to watch."}
                     return viewing.result
                 if state != "downloaded":

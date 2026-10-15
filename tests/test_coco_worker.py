@@ -37,3 +37,31 @@ print(json.dumps({'result':result,'calls':calls}))
     assert len(data["result"]["items"]) == 1
     assert data["result"]["items"][0]["quality"] == "1080p"
     assert data["result"]["items"][0]["hash"] == "a" * 40
+
+
+def test_additional_upstream_parsers_and_media_scopes():
+    script = """
+import json,sys
+sys.path.insert(0,'coco_worker')
+from worker import run_search
+calls=[]
+def request(url,**kwargs):
+ calls.append(url)
+ if 'yts.mx' in url:
+  return json.dumps({'status':'ok','data':{'movie_count':1,'movies':[{'title_long':'Big Buck Bunny (2008)',
+   'torrents':[{'hash':'c'*40,'quality':'1080p','type':'web','seeds':10,'size':'1 GB'}]}]}})
+ return None
+title={'title':'Big Buck Bunny','year':'2008','ids':{'imdb_id':'tt1254207'}}
+movies=run_search({'title':title,'providers':['piratebay','ytsmx','eztv','not-allowed']},request=request)
+episodes=run_search({'title':title,'season':1,'episode':2,'providers':['ytsmx']},request=request)
+missing=run_search({'title':{'title':'A Film','year':'2020'},'providers':['torrentio','ytsmx']},request=request)
+print(json.dumps({'movies':movies,'episodes':episodes,'missing':missing,'calls':calls}))
+"""
+    result = subprocess.run([sys.executable, '-c', script], cwd=ROOT, capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    assert data['movies']['providers'] == {'ytsmx':'ok','eztv':'skipped'}
+    assert {item['hash'] for item in data['movies']['items']} == {'c'*40}
+    assert data['episodes']['providers'] == {'ytsmx':'skipped'}
+    assert data['missing']['providers'] == {'torrentio':'missing_imdb','ytsmx':'missing_imdb'}
+    assert len(data['calls']) == 1

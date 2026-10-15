@@ -35,6 +35,15 @@
         });
     }
     function dashboard() {
+        request('GET', '/api/admin/source-providers', null, function (ok, data) {
+            if (!ok) { error(data); return; }
+            var html = '<legend>Search providers</legend>';
+            data.providers.forEach(function (provider) {
+                html += '<label class="provider-option" for="provider-' + esc(provider.id) + '"><input id="provider-' + esc(provider.id) + '" name="provider" type="checkbox" value="' + esc(provider.id) + '"' + (provider.enabled ? ' checked' : '') + '><span><strong>' + esc(provider.name) + '</strong><small>' + esc(provider.scope) + '</small></span></label>';
+            });
+            $('provider-options').innerHTML = html;
+            $('source-providers').querySelector('button[type="submit"]').disabled = false;
+        });
         request('GET', '/api/admin/config', null, function (ok, data) {
             if (!ok) { error(data); return; } config = data;
             ['tmdb', 'trakt', 'real_debrid'].forEach(function (service) {
@@ -131,6 +140,12 @@
         if (id === 'personal-token') {
             if (profile().accounts.real_debrid.state !== 'disconnected' && !window.confirm('Replace the current Real-Debrid account for ' + profile().name + '?')) { return; }
             payload.token = $('personal-rd-token').value.trim(); $('personal-rd-token').value = ''; path = '/api/admin/profiles/' + selected + '/real_debrid/token'; complete = function () { cancelFlow(); message('Real-Debrid connected.'); dashboard(); };
+        }
+        if (id === 'source-providers') {
+            payload.providers = [];
+            Array.prototype.forEach.call(form.querySelectorAll('input[name="provider"]:checked'), function (input) { payload.providers.push(input.value); });
+            method = 'PUT'; path = '/api/admin/source-providers';
+            complete = function () { message('Search providers saved. Your next search will use this selection.'); };
         }
         if (id.indexOf('setup-') === 0) {
             var service = id.slice(6); method = 'PUT'; path = '/api/admin/config/' + service;

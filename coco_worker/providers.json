@@ -1,0 +1,10 @@
+[
+  {"id":"torrentio","name":"Torrentio","scope":"Movies and episodes","default":true,"imdb":true},
+  {"id":"bitsearch","name":"BitSearch","scope":"Movies and episodes","default":true},
+  {"id":"eztv","name":"EZTV","scope":"Episodes","default":true},
+  {"id":"knaben","name":"Knaben","scope":"Movies and episodes","default":true},
+  {"id":"ytsmx","name":"YTS","scope":"Movies","default":true,"imdb":true},
+  {"id":"bitcq","name":"BitCQ","scope":"Movies and episodes","default":false},
+  {"id":"nyaa","name":"Nyaa","scope":"Anime movies and episodes","default":false},
+  {"id":"1337x","name":"1337x","scope":"Movies and episodes","default":false}
+]

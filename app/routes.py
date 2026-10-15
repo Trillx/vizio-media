@@ -13,6 +13,7 @@ from app.catalog import Catalog
 from app.discovery import Discovery
 from app.config import ROOT
 from app.integrations import SERVICES, ServiceError, Services
+from app.coco import DEFAULT_PROVIDERS, PROVIDERS, PROVIDER_IDS
 from app.security import LoginLimiter, check_password, password_hash, token_hash
 from app.store import Store
 
@@ -66,6 +67,17 @@ class Credentials(Body):
 
 class PersonalToken(Body):
     token: str = Field(min_length=5,max_length=2048,pattern=r"^[A-Za-z0-9._~-]+$")
+
+
+class ProviderSelection(Body):
+    providers: list[str] = Field(max_length=len(PROVIDERS))
+
+    @field_validator("providers")
+    @classmethod
+    def known_providers(cls, value):
+        if len(value) != len(set(value)) or set(value) - PROVIDER_IDS:
+            raise ValueError("Choose each listed provider at most once.")
+        return value
 
 
 class Linking:
@@ -167,6 +179,18 @@ def feature_routes(store: Store, services: Services, catalog: Catalog, linking: 
     def config(request: Request):
         linking.admin(request)
         return services.configuration_status()
+
+    @router.get("/api/admin/source-providers")
+    def source_providers(request: Request):
+        linking.admin(request)
+        enabled=services.config("cocoscrapers").get("providers",DEFAULT_PROVIDERS)
+        return {"providers":[{**item,"enabled":item["id"] in enabled} for item in PROVIDERS]}
+
+    @router.put("/api/admin/source-providers")
+    def save_source_providers(body: ProviderSelection, request: Request):
+        linking.admin(request)
+        store.save_config("cocoscrapers",services.vault.seal({"providers":body.providers}))
+        return {"providers":[{**item,"enabled":item["id"] in body.providers} for item in PROVIDERS]}
 
     @router.put("/api/admin/config/{service}")
     def configure(service: str, body: Credentials, request: Request):

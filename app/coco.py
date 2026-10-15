@@ -12,13 +12,20 @@ from app.integrations import ServiceError
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_SHA256 = "f33b11e3fcc8967aeca65548398212ba7c806298845eac2e57ba38cd35a6436e"
+PROVIDERS = json.loads((ROOT / "coco_worker" / "providers.json").read_text(encoding="utf-8"))
+PROVIDER_IDS = {item["id"] for item in PROVIDERS}
+DEFAULT_PROVIDERS = [item["id"] for item in PROVIDERS if item.get("default")]
 
 
 class CocoProvider:
-    def __init__(self):
+    def __init__(self, settings=None):
         self.slots = threading.BoundedSemaphore(2)
+        self.settings = settings or (lambda: {})
 
     def search(self, title, season=None, episode=None):
+        enabled = [name for name in self.settings().get("providers", DEFAULT_PROVIDERS) if name in PROVIDER_IDS]
+        if not enabled:
+            return {"items": [], "providers": {}}
         archive = ROOT / "vendor" / "cocoscrapers-1.0.32.zip"
         if not archive.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
             raise ServiceError("CocoScrapers is missing or damaged. Reinstall the application.", 503)
@@ -29,7 +36,7 @@ class CocoProvider:
             environment = {key: value for key, value in os.environ.items()
                            if key.upper() in {"SYSTEMROOT", "WINDIR", "TEMP", "TMP", "PATH", "LANG", "SSL_CERT_FILE"}}
             result = subprocess.run([sys.executable, "-I", str(ROOT / "coco_worker" / "worker.py")],
-                input=json.dumps({"title": title, "season": season, "episode": episode}),
+                input=json.dumps({"title": title, "season": season, "episode": episode, "providers": enabled}),
                 text=True, capture_output=True, timeout=23, env=environment,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             if result.returncode or len(result.stdout) > 2 * 1024 * 1024:

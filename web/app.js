@@ -11,6 +11,7 @@
     var saved = { position: 0, duration: 0 }, resumeAt = 0, progressTicket = 0;
     var pendingProgress = null, savingProgress = false;
     var streamMedia = null, streamReturn = null, streamSaved = null;
+    var streamHooks = null, streamStarted = false, streamPlaying = false, streamProofPosition = 0, mediaSerial = 0;
     var progressQueue = [];
     var refreshAfterSave = false;
     var lastSave = 0, hudTimer = null, toastTimer = null;
@@ -42,6 +43,7 @@
             if (!callback) { return; }
             var result = null;
             try { result = JSON.parse(xhr.responseText); } catch (ignored) { /* Report failed request below. */ }
+            if (xhr.status < 200 || xhr.status >= 300) { result = result || {}; result.status = xhr.status; }
             callback(xhr.status >= 200 && xhr.status < 300, result);
             callback = null;
         }
@@ -204,6 +206,7 @@
         });
     }
     function saveProgress(force) {
+        if (streamHooks && !streamStarted) { return; }
         if (!isFinite(video.duration) || video.duration <= 0 || !isFinite(video.currentTime)) { return; }
         var now = new Date().getTime();
         if (!force && now - lastSave < 5000) { return; }
@@ -230,9 +233,16 @@
     }
     function play() {
         // Legacy browsers return undefined; modern browsers return a Promise.
+        var current = mediaSerial;
         var result = video.play();
         if (result && result['catch']) {
             result['catch'](function (error) {
+                if (current !== mediaSerial || mode !== 'player' || error.name === 'AbortError') { return; }
+                if (streamHooks && !streamStarted) {
+                    if (error.name === 'NotAllowedError') { streamHooks.blocked(); }
+                    else { streamHooks.failed('This video could not start.'); }
+                    return;
+                }
                 playerStatus('Playback did not start. Press OK to retry. ' + error.name);
                 log('error', { message: 'play rejected', name: error.name });
                 hud();
@@ -240,6 +250,7 @@
         }
     }
     function startVideo(fromBeginning) {
+        mediaSerial += 1; streamHooks = null; streamStarted = false;
         streamMedia = null; streamReturn = null; streamSaved = null;
         byId('close-player').lastChild.nodeValue = 'Library';
         if (mode === 'home' && focused) { previousFocus = focused.id; }
@@ -260,6 +271,7 @@
         if (mode !== 'player') { return; }
         refreshAfterSave = true;
         saveProgress(true);
+        mediaSerial += 1; streamHooks = null;
         video.pause();
         clearTimeout(hudTimer);
         visible(byId('player'), false);
@@ -270,6 +282,13 @@
         streamMedia = null; streamReturn = null; streamSaved = null;
         if (!savingProgress && !progressQueue.length && window.VizioHome) { refreshAfterSave = false; window.VizioHome.refreshPersonal(); }
         if (returning) { returning(); }
+    }
+    function stopStreamAttempt() {
+        mediaSerial += 1; streamHooks = null; streamStarted = false; streamPlaying = false;
+        streamMedia = null; streamReturn = null; streamSaved = null;
+        video.pause(); clearTimeout(hudTimer);
+        visible(byId('player'), false); video.removeAttribute('src'); video.load();
+        if (mode === 'player') { setMode('home', homeRows, previousFocus); }
     }
     function togglePlay() { if (video.paused || video.ended) { play(); } else { video.pause(); } hud(); }
     function updateTimeline() {
@@ -392,14 +411,20 @@
     }, false);
     video.addEventListener('loadedmetadata', function () {
         if (resumeAt > 0) { video.currentTime = Math.min(resumeAt, video.duration - 0.1); resumeAt = 0; }
+        streamProofPosition = video.currentTime;
         updateTimeline();
         log('video', { event: 'loadedmetadata', duration: video.duration, width: video.videoWidth, height: video.videoHeight });
     }, false);
     video.addEventListener('timeupdate', function () {
         updateTimeline();
+        if (mode === 'player' && streamHooks && !streamStarted && streamPlaying && !video.paused && !video.seeking &&
+                video.readyState >= 2 && video.videoWidth > 0 && video.currentTime > streamProofPosition + 0.25) {
+            streamStarted = true; streamHooks.started();
+        }
         if (mode === 'player') { saveProgress(false); }
     }, false);
     video.addEventListener('playing', function () {
+        streamPlaying = true;
         playerStatus(streamMedia ? 'Playing through Real-Debrid.' : 'Playing locally. Listen for music and effects.');
         playButton('Pause'); hud();
         log('video', { event: 'playing', position: video.currentTime });
@@ -419,6 +444,7 @@
     video.addEventListener('error', function () {
         if (mode !== 'player') { return; }
         var code = video.error ? video.error.code : 0;
+        if (streamHooks && !streamStarted) { streamHooks.failed('This video format or connection did not work.'); return; }
         var messages = { 1: 'Playback was interrupted.', 2: 'The video could not be downloaded. Check the server and Wi-Fi. Go back and retry the source.', 3: 'The TV could not decode this video or audio. Go back and try an H.264/AAC source.', 4: 'The TV rejected this video format. Go back and choose another source.' };
         playerStatus((messages[code] || 'Unknown video error.') + ' Error code ' + code);
         log('error', { message: 'video error', code: code, ready_state: video.readyState, network_state: video.networkState }); hud();
@@ -443,8 +469,11 @@
             if (mode === 'home') { rows = homeRows; focusId(preferred || (focused && focused.id) || 'hero-details'); }
         },
         play: function () { if (window.VizioExtras) { window.VizioExtras.dismiss(); } startVideo(true); },
-        playStream: function (media, fromBeginning, returning) {
+        stopStreamAttempt: stopStreamAttempt,
+        playStream: function (media, fromBeginning, returning, hooks) {
+            stopStreamAttempt();
             streamMedia = media; streamReturn = returning; streamSaved = media.progress || {position: 0, duration: 0};
+            streamHooks = hooks || null; streamStarted = !hooks; streamPlaying = false;
             byId('close-player').lastChild.nodeValue = 'Sources';
             resumeAt = !fromBeginning && streamSaved.position > 1 && streamSaved.position < streamSaved.duration - 2 ? streamSaved.position : 0;
             if (mode === 'home' && focused) { previousFocus = focused.id; }
