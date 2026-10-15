@@ -13,7 +13,6 @@ from app.catalog import Catalog
 from app.discovery import Discovery
 from app.config import ROOT
 from app.integrations import SERVICES, ServiceError, Services
-from app.providers import DebridLibraryProvider
 from app.security import LoginLimiter, check_password, password_hash, token_hash
 from app.store import Store
 
@@ -116,7 +115,7 @@ class Linking:
             raise HTTPException(429,"Too many attempts. Wait one minute before trying again.",headers={"Retry-After":"60"})
 
 
-def feature_routes(store: Store, services: Services, catalog: Catalog, linking: Linking) -> APIRouter:
+def feature_routes(store: Store, services: Services, catalog: Catalog, linking: Linking, playback) -> APIRouter:
     router=APIRouter()
     discovery=Discovery(store,services,catalog)
 
@@ -231,6 +230,7 @@ def feature_routes(store: Store, services: Services, catalog: Catalog, linking: 
     def personal_token(profile_id: str, body: PersonalToken, request: Request):
         linking.admin(request)
         known_profile(profile_id)
+        playback.invalidate(profile_id)
         services.personal_token(profile_id,body.token)
         return services.status(profile_id)["real_debrid"]
 
@@ -256,6 +256,7 @@ def feature_routes(store: Store, services: Services, catalog: Catalog, linking: 
     def admin_disconnect(profile_id: str, service: str, request: Request):
         linking.admin(request)
         known_profile(profile_id)
+        if service == "real_debrid": playback.invalidate(profile_id)
         return services.disconnect(profile_id,service)
 
     @router.post("/api/admin/profiles/{profile_id}/accounts/{service}/refresh")
@@ -318,7 +319,9 @@ def feature_routes(store: Store, services: Services, catalog: Catalog, linking: 
 
     @router.delete("/api/accounts/{service}")
     def disconnect(service: str, request: Request):
-        return services.disconnect(linking.profile(request),service)
+        profile_id=linking.profile(request)
+        if service == "real_debrid": playback.invalidate(profile_id)
+        return services.disconnect(profile_id,service)
 
     @router.get("/api/catalog/search")
     def search(q: str = Query(default="",max_length=120), kind: Literal["all","movie","tv"] = "all", page: int = Query(default=1,ge=1,le=500)):
@@ -353,13 +356,13 @@ def feature_routes(store: Store, services: Services, catalog: Catalog, linking: 
         return catalog.season(media_id,number)
 
     @router.get("/api/catalog/{media_id}/sources")
-    def sources(media_id: str, request: Request, season: int | None = Query(default=None,ge=0,le=200), episode: int | None = Query(default=None,ge=1,le=1000)):
+    def sources(media_id: str, request: Request, season: int | None = Query(default=None,ge=0,le=200), episode: int | None = Query(default=None,ge=1,le=1000), discover: bool = False):
         profile_id=linking.profile(request)
         if episode is not None and season is None:
             raise HTTPException(400,"Choose a season before an episode.")
         title=catalog.details(media_id)
-        items=DebridLibraryProvider(services).search(profile_id,title,season,episode)
-        return {"items":items,"provider":"real_debrid_library","notice":"Filename matches from up to 100 downloads and 100 torrents in your linked account. Review each match. This does not search public providers or resolve playback."}
+        owner=linking.session(request,"profile")["token_hash"]
+        return playback.search(profile_id,owner,title,season,episode,discover)
 
     @router.get("/api/artwork/{size}/{name}")
     def artwork(size: str,name: str):

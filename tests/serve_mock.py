@@ -1,6 +1,7 @@
 """Isolated browser fixture. Never used by run.py or production routes."""
 
 import sys
+import os
 import tempfile
 from pathlib import Path
 
@@ -13,6 +14,7 @@ sys.path.insert(0,str(ROOT))
 from app.config import Settings
 from app.main import create_app
 from test_accounts_catalog import Cloud
+from playback_fixtures import FakeCoco
 
 
 class BrowserCloud(Cloud):
@@ -39,11 +41,12 @@ if __name__=='__main__':
     (ROOT/'.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='browser-accounts-',dir=ROOT/'.tmp') as directory:
         cloud=BrowserCloud()
-        app=create_app(Settings(bind_ip='127.0.0.1',port=8767,data_dir=Path(directory),media_dir=ROOT/'media'),transport=httpx.MockTransport(cloud))
+        port=int(os.getenv('VIZIO_FIXTURE_PORT','8767'))
+        app=create_app(Settings(bind_ip='127.0.0.1',port=port,data_dir=Path(directory),media_dir=ROOT/'media'),transport=httpx.MockTransport(cloud),coco=FakeCoco())
 
         @app.post('/__test__/approve/{service}')
         def approve(service: str):
             cloud.approved[service]=True
             return {'approved':True}
 
-        uvicorn.run(app,host='127.0.0.1',port=8767,proxy_headers=False,access_log=False)
+        uvicorn.run(app,host='127.0.0.1',port=port,proxy_headers=False,access_log=False)

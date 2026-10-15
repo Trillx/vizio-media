@@ -44,4 +44,4 @@ The account milestone adds these boundaries:
 
 `run.py` binds separate LAN and loopback sockets for one Uvicorn worker. Per-profile service locks serialize refresh and sign-in transitions. Both rotated tokens persist in one SQLite transaction. Application settings cannot change while accounts are linked or a device sign-in is pending. These locks require the documented single-worker deployment.
 
-See [account setup, data boundaries, and current scope](accounts-and-search.md). The separate provider and future resolver follow the FenLight+ architectural reference without copying its implementation or Kodi runtime assumptions.
+See [account setup](accounts-and-search.md) and [source search and playback](playback.md). `app/playback.py` owns source selection, Real-Debrid preparation, file mapping, and a bounded streaming relay. `app/coco.py` invokes the separately licensed compatibility worker over JSON. Its upstream provider source remains in the pinned, unchanged archive. Kodi is not required. License boundaries and source provenance are recorded in [third-party notices](../THIRD_PARTY_NOTICES.md).

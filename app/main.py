@@ -18,6 +18,8 @@ from app.security import Vault
 from app.integrations import Services, ServiceError
 from app.catalog import Catalog
 from app.routes import Linking, feature_routes
+from app.playback import Playback
+from app.playback_routes import playback_routes
 
 TITLE_ID = "big-buck-bunny"
 
@@ -52,7 +54,7 @@ class Diagnostic(BaseModel):
         return self
 
 
-def create_app(settings: Settings | None = None, *, test_client: bool = False, transport=None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, test_client: bool = False, transport=None, coco=None, media_transport=None) -> FastAPI:
     settings = settings or Settings.from_env()
     store = Store(settings.data_dir)
     sealed=store.sealed_values()
@@ -62,10 +64,12 @@ def create_app(settings: Settings | None = None, *, test_client: bool = False, t
     services=Services(store,vault,transport)
     catalog=Catalog(store,services,settings.data_dir)
     linking=Linking(store,services,test_client=test_client)
+    playback=Playback(services,store,coco=coco,transport=media_transport)
 
     @asynccontextmanager
     async def lifespan(app):
         yield
+        playback.close()
         services.close()
 
     app = FastAPI(title="Vizio Media", docs_url=None, redoc_url=None, openapi_url=None,lifespan=lifespan)
@@ -74,6 +78,7 @@ def create_app(settings: Settings | None = None, *, test_client: bool = False, t
     app.state.services=services
     app.state.catalog=catalog
     app.state.linking=linking
+    app.state.playback=playback
     allowed_clients = {settings.bind_ip, settings.tv_ip, "127.0.0.1", "::1"}
     allowed_hosts = [settings.bind_ip, "localhost", "127.0.0.1", "[::1]"]
     if test_client:
@@ -136,7 +141,7 @@ def create_app(settings: Settings | None = None, *, test_client: bool = False, t
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "version": "0.2.0", "media_ready": (settings.media_dir / "sample.mp4").is_file()}
+        return {"status": "ok", "version": "0.3.0", "media_ready": (settings.media_dir / "sample.mp4").is_file()}
 
     @app.get("/api/progress/{title_id}")
     def get_progress(title_id: str, request: Request):
@@ -167,6 +172,7 @@ def create_app(settings: Settings | None = None, *, test_client: bool = False, t
         # Starlette FileResponse supports byte ranges without loading the film into memory.
         return FileResponse(path, media_type="video/mp4")
 
-    app.include_router(feature_routes(store,services,catalog,linking))
+    app.include_router(feature_routes(store,services,catalog,linking,playback))
+    app.include_router(playback_routes(playback,linking,catalog,store))
     app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
     return app

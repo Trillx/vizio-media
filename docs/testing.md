@@ -8,7 +8,7 @@ python -m pytest -q
 node --test tests/remote.test.cjs tests/service-link.test.cjs
 ```
 
-The Python suite creates temporary SQLite databases and mocks provider HTTP responses. It checks encryption, profile isolation, authentication state, catalog and home collections, stale metadata, scoped watchlists, byte ranges, and request guards. Test credentials are fictional and must never be replaced with real accounts.
+The Python suite creates temporary SQLite databases and mocks provider HTTP responses. It checks encryption, profile isolation, authentication state, catalog and home collections, stale metadata, scoped watchlists, byte ranges, and request guards. Playback checks cover source deduplication, the actual bundled CocoScrapers parser, file selection, concurrent clicks, episode matching, signed-link refresh, CDN MIME headers, codec warnings, stream isolation, and resume. Test credentials are fictional and must never be replaced with real accounts.
 
 For optional browser checks, install Playwright and its Chromium browser in your development environment, then start the isolated fixture in a separate terminal:
 

@@ -69,6 +69,8 @@ class Services:
             raise ServiceError("The service rejected these credentials. Check setup or reconnect the account.", 401)
         if response.status_code >= 400 or response.is_redirect:
             raise ServiceError("The service could not complete that request. Try again shortly.")
+        if response.status_code == 204 or (response.status_code == 202 and not response.content):
+            return None
         return self.json(response)
 
     @staticmethod
@@ -336,6 +338,8 @@ class Services:
                     response=self.raw(method,base+path,headers=headers,**kwargs)
                     if response.status_code==401:
                         self.store.mark_account(profile_id,service,"reconnect_required")
+            if service == "real_debrid" and response.status_code == 403 and path.startswith(("/torrents/", "/unrestrict/")):
+                raise ServiceError("Real-Debrid denied this request. Check Premium status and traffic limits, or choose another source.", 403)
             return self.checked(response)
 
     def disconnect(self, profile_id: str, service: str) -> dict:

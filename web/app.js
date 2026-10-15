@@ -10,6 +10,9 @@
     var playerButton = 'toggle-play';
     var saved = { position: 0, duration: 0 }, resumeAt = 0, progressTicket = 0;
     var pendingProgress = null, savingProgress = false;
+    var streamMedia = null, streamReturn = null, streamSaved = null;
+    var progressQueue = [];
+    var refreshAfterSave = false;
     var lastSave = 0, hudTimer = null, toastTimer = null;
     var lastRemote = 'No button received yet', remoteLog = [], videoState = 'Not started';
     var checks = { navigation: 'Not tested', picture: 'Not tested', audio: 'Not tested', resume: 'Not tested' };
@@ -78,9 +81,10 @@
         if (mode === 'home' && focused && window.VizioHome) { window.VizioHome.focused(focused); }
         if (mode === 'player' && focused) {
             if (focused.id !== 'timeline') { playerButton = focused.id; }
+            var backHint = streamMedia ? 'Sources' : 'Library';
             byId('player-help').innerHTML = focused.id === 'timeline' ?
-                '<span class="hint"><span class="keycap">Left / Right</span>Seek 10s</span><span class="hint"><span class="keycap">Down</span>Buttons</span><span class="hint"><span class="keycap">OK</span>Play / pause</span><span class="hint"><span class="keycap">Back</span>Library</span>' :
-                '<span class="hint"><span class="keycap">Left / Right</span>Choose button</span><span class="hint"><span class="keycap">OK</span>Select</span><span class="hint"><span class="keycap">Up</span>Timeline</span><span class="hint"><span class="keycap">Back</span>Library</span>';
+                '<span class="hint"><span class="keycap">Left / Right</span>Seek 10s</span><span class="hint"><span class="keycap">Down</span>Buttons</span><span class="hint"><span class="keycap">OK</span>Play / pause</span><span class="hint"><span class="keycap">Back</span>' + backHint + '</span>' :
+                '<span class="hint"><span class="keycap">Left / Right</span>Choose button</span><span class="hint"><span class="keycap">OK</span>Select</span><span class="hint"><span class="keycap">Up</span>Timeline</span><span class="hint"><span class="keycap">Back</span>' + backHint + '</span>';
             hud();
         }
     }
@@ -179,14 +183,24 @@
         });
     }
     function flushProgress() {
-        if (savingProgress || pendingProgress === null) { return; }
-        var snapshot = pendingProgress;
-        pendingProgress = null;
+        if (pendingProgress !== null) {
+            var entry = pendingProgress, i;
+            pendingProgress = null;
+            for (i = progressQueue.length - 1; i >= 0; i -= 1) {
+                if (progressQueue[i].path === entry.path) { progressQueue.splice(i, 1); }
+            }
+            progressQueue.push(entry);
+        }
+        if (savingProgress || !progressQueue.length) { return; }
+        var snapshot = progressQueue.shift();
         savingProgress = true;
-        request('PUT', '/api/progress/big-buck-bunny', snapshot, function (ok) {
+        request('PUT', snapshot.path, snapshot.body, function (ok) {
             savingProgress = false;
             if (!ok) { toast('Playback position was not saved. Check the server connection.'); }
             flushProgress();
+            if (!savingProgress && !progressQueue.length && refreshAfterSave && window.VizioHome) {
+                refreshAfterSave = false; window.VizioHome.refreshPersonal();
+            }
         });
     }
     function saveProgress(force) {
@@ -194,10 +208,11 @@
         var now = new Date().getTime();
         if (!force && now - lastSave < 5000) { return; }
         lastSave = now;
-        saved = { position: Math.min(video.currentTime, video.duration), duration: video.duration };
-        updateProgress();
+        var position = { position: Math.min(video.currentTime, video.duration), duration: video.duration };
+        if (streamMedia) { streamSaved = position; }
+        else { saved = position; updateProgress(); }
         // Serialize writes so a slow earlier request cannot overwrite a later seek.
-        pendingProgress = { position: saved.position, duration: saved.duration };
+        pendingProgress = {path: streamMedia ? '/api/playback/' + streamMedia.id + '/progress' : '/api/progress/big-buck-bunny', body: position};
         flushProgress();
     }
     function hud() {
@@ -225,12 +240,17 @@
         }
     }
     function startVideo(fromBeginning) {
+        streamMedia = null; streamReturn = null; streamSaved = null;
+        byId('close-player').lastChild.nodeValue = 'Library';
         if (mode === 'home' && focused) { previousFocus = focused.id; }
         visible(byId('dialog'), false);
         visible(byId('player'), true);
         setMode('player', [['timeline'], ['seek-back', 'toggle-play', 'seek-forward', 'close-player']], 'toggle-play');
         resumeAt = !fromBeginning && canResume() ? saved.position : 0;
         playerStatus('Loading the local trailer...');
+        text(byId('player-title'), 'Big Buck Bunny');
+        text(byId('player-attribution'), 'Blender Foundation / CC BY 3.0');
+        video.setAttribute('aria-label', 'Big Buck Bunny trailer');
         video.src = '/media/sample.mp4';
         video.load();
         play();
@@ -238,6 +258,7 @@
     }
     function closePlayer() {
         if (mode !== 'player') { return; }
+        refreshAfterSave = true;
         saveProgress(true);
         video.pause();
         clearTimeout(hudTimer);
@@ -245,6 +266,10 @@
         video.removeAttribute('src');
         video.load();
         setMode('home', homeRows, previousFocus);
+        var returning = streamReturn;
+        streamMedia = null; streamReturn = null; streamSaved = null;
+        if (!savingProgress && !progressQueue.length && window.VizioHome) { refreshAfterSave = false; window.VizioHome.refreshPersonal(); }
+        if (returning) { returning(); }
     }
     function togglePlay() { if (video.paused || video.ended) { play(); } else { video.pause(); } hud(); }
     function updateTimeline() {
@@ -375,7 +400,7 @@
         if (mode === 'player') { saveProgress(false); }
     }, false);
     video.addEventListener('playing', function () {
-        playerStatus('Playing locally. Listen for music and effects.');
+        playerStatus(streamMedia ? 'Playing through Real-Debrid.' : 'Playing locally. Listen for music and effects.');
         playButton('Pause'); hud();
         log('video', { event: 'playing', position: video.currentTime });
     }, false);
@@ -384,17 +409,17 @@
         if (mode === 'player') { playerStatus('Paused'); saveProgress(true); hud(); }
     }, false);
     video.addEventListener('seeked', function () { if (mode === 'player') { saveProgress(true); } }, false);
-    video.addEventListener('waiting', function () { if (mode === 'player') { playerStatus('Buffering the local file...'); hud(); } }, false);
+    video.addEventListener('waiting', function () { if (mode === 'player') { playerStatus(streamMedia ? 'Buffering video...' : 'Buffering the local file...'); hud(); } }, false);
     video.addEventListener('ended', function () {
         if (mode !== 'player') { return; }
-        saveProgress(true); playerStatus('Trailer finished. Back returns to the library.');
+        saveProgress(true); playerStatus(streamMedia ? 'Finished. Back returns to sources.' : 'Trailer finished. Back returns to the library.');
         playButton('Replay'); hud();
         log('video', { event: 'ended', position: video.currentTime });
     }, false);
     video.addEventListener('error', function () {
         if (mode !== 'player') { return; }
         var code = video.error ? video.error.code : 0;
-        var messages = { 1: 'Playback was interrupted.', 2: 'The video could not be downloaded. Check the server and Wi-Fi.', 3: 'The browser could not decode this H.264/AAC file.', 4: 'The browser rejected the video format or the sample file is missing.' };
+        var messages = { 1: 'Playback was interrupted.', 2: 'The video could not be downloaded. Check the server and Wi-Fi. Go back and retry the source.', 3: 'The TV could not decode this video or audio. Go back and try an H.264/AAC source.', 4: 'The TV rejected this video format. Go back and choose another source.' };
         playerStatus((messages[code] || 'Unknown video error.') + ' Error code ' + code);
         log('error', { message: 'video error', code: code, ready_state: video.readyState, network_state: video.networkState }); hud();
     }, false);
@@ -418,9 +443,22 @@
             if (mode === 'home') { rows = homeRows; focusId(preferred || (focused && focused.id) || 'hero-details'); }
         },
         play: function () { if (window.VizioExtras) { window.VizioExtras.dismiss(); } startVideo(true); },
+        playStream: function (media, fromBeginning, returning) {
+            streamMedia = media; streamReturn = returning; streamSaved = media.progress || {position: 0, duration: 0};
+            byId('close-player').lastChild.nodeValue = 'Sources';
+            resumeAt = !fromBeginning && streamSaved.position > 1 && streamSaved.position < streamSaved.duration - 2 ? streamSaved.position : 0;
+            if (mode === 'home' && focused) { previousFocus = focused.id; }
+            visible(byId('dialog'), false); visible(byId('player'), true);
+            text(byId('player-title'), media.title); text(byId('player-attribution'), 'Real-Debrid');
+            video.setAttribute('aria-label', media.title);
+            setMode('player', [['timeline'], ['seek-back', 'toggle-play', 'seek-forward', 'close-player']], 'toggle-play');
+            playerStatus('Loading video...'); lastSave = 0;
+            video.src = media.stream; video.load(); play(); hud();
+        },
         reloadProgress: function () {
             var current = ++progressTicket;
             pendingProgress = null;
+            progressQueue = [];
             saved = {position: 0, duration: 0}; updateProgress(false);
             request('GET', '/api/progress/big-buck-bunny', null, function (ok, data) {
                 if (ok && current === progressTicket) { saved = {position: data.position, duration: data.duration}; updateProgress(); }

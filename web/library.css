@@ -56,3 +56,11 @@
 .source-item { max-height: 132px; overflow: auto; }
 .source-item > span { display: block; max-height: 58px; overflow: hidden; }
 .catalog-overview:focus { outline: 3px solid #ffffff; outline-offset: 5px; }
+.source-choice { display: block; width: 100%; text-align: left; min-height: 98px; max-height: 135px; overflow: hidden; }
+.source-choice:focus, .source-choice.focused, .source-choice:hover { outline: 4px solid #ffffff; outline-offset: 4px; background: #414141; }
+.source-choice > span { max-height: 56px; line-height: 1.2; }
+.source-choice small { margin-top: 6px; font-size: 19px; line-height: 1.2; }
+.dialog-panel .source-notice { max-height: 72px; overflow: auto; font-size: 21px; margin-bottom: 20px; }
+.source-warning, .dialog-panel .source-warning { color: #f1d8a6; }
+.dialog-panel .ready-filename { font-size: 24px; overflow-wrap: break-word; max-height: 160px; overflow: auto; }
+.dialog-panel .prepare-progress { font: 64px Georgia, serif; color: #ffffff; }

@@ -8,6 +8,7 @@
     var title = null, season = null, episode = null, listOffset = 0, sourceResult = null, sourceOffset = 0, detailOrigin = 'search';
     var flowService = '', flowTick = null, activeFlow = null;
     var names = {trakt: 'Trakt', real_debrid: 'Real-Debrid'};
+    var playbackState = null, playbackTimer = null, playbackStarted = 0, fileOffset = 0;
     function button(id, label, action, value, classes) {
         return '<button id="' + id + '" class="button ' + (classes || 'secondary') + '" data-action="' + action + '"' +
             (value === undefined ? '' : ' data-value="' + esc(value) + '"') + '>' + esc(label) + '</button>';
@@ -16,7 +17,7 @@
         view = next; $('dialog').setAttribute('data-extra', next); A.open(heading, html, rows, focus);
     }
     function fail(data) { return esc((data && data.detail) || 'The server could not complete this request. Try again.'); }
-    function load(next, heading, path, callback) {
+    function load(next, heading, path, callback, timeout) {
         var current = ++ticket;
         open(next, heading, '<p role="status">Loading...</p>', [], 'dialog-close');
         req('GET', path, null, function (ok, data) {
@@ -26,7 +27,7 @@
                 return;
             }
             callback(data);
-        });
+        }, timeout);
     }
     function refreshMe(callback) {
         var current = ++meTicket;
@@ -102,11 +103,11 @@
         load('detail', 'Title details', '/api/catalog/' + encodeURIComponent(id), function (data) { title = data; renderDetail(); });
     }
     function renderDetail() {
-        var ids = ['catalog-files'], actions = button('catalog-files', 'Find in my Real-Debrid files', 'catalog-sources');
-        if (title.kind === 'tv') { ids.unshift('catalog-seasons'); actions = button('catalog-seasons', 'Seasons and episodes', 'catalog-seasons', undefined, 'primary') + actions; }
+        var ids = ['catalog-files'], actions = button('catalog-files', 'Find sources', 'catalog-sources', undefined, 'primary');
+        if (title.kind === 'tv') { ids = ['catalog-seasons']; actions = button('catalog-seasons', 'Seasons and episodes', 'catalog-seasons', undefined, 'primary'); }
         if (title.playable) { ids.unshift('catalog-play'); actions = button('catalog-play', 'Play local trailer', 'catalog-play', undefined, 'primary') + actions; }
         var html = '<div class="film-details">' + (title.poster ? '<img class="detail-poster" src="' + esc(title.poster) + '" alt="">' : '') + '<div class="detail-copy"><p class="detail-meta">' + esc(title.year || 'Year unknown') + ' / ' + (title.kind === 'tv' ? 'Series' : 'Movie') + (title.runtime ? ' / ' + esc(title.runtime) + ' min' : '') + '</p>' +
-            '<p id="catalog-overview" class="catalog-overview" tabindex="0">' + esc(title.overview) + '</p><p class="catalog-note">' + esc((title.genres || []).join(' / ')) + '</p><div class="dialog-actions">' + actions + '</div><p class="attribution">' + (title.playable ? 'Licensed local test clip.' : 'Catalog metadata does not indicate playback availability. File search checks your linked account.') + '</p></div></div>';
+            '<p id="catalog-overview" class="catalog-overview" tabindex="0">' + esc(title.overview) + '</p><p class="catalog-note">' + esc((title.genres || []).join(' / ')) + '</p><div class="dialog-actions">' + actions + '</div><p class="attribution">' + (title.playable ? 'Licensed local test clip.' : 'Search CocoScrapers and your Real-Debrid account for sources. Availability is checked when you select one.') + '</p></div></div>';
         open('detail', title.title, html, [['catalog-overview'], ids], ids[0]);
     }
     function pagedList(nextView, heading, entries, action, label) {
@@ -126,23 +127,78 @@
     function renderSeasons() { pagedList('seasons', title.title, title.seasons || [], 'catalog-season', function (s) { return s.name + ' / ' + s.episode_count + ' episodes'; }); }
     function renderEpisodes() { pagedList('episodes', season.name, season.episodes, 'catalog-episode', function (e) { return e.number + '. ' + e.name; }); }
     function renderEpisode() {
-        open('episode', episode.number + '. ' + episode.name, '<p class="detail-meta">' + esc(title.title) + ' / Season ' + season.number + '</p><p class="catalog-overview">' + esc(episode.overview) + '</p>' + button('episode-files', 'Find episode in my files', 'catalog-sources', undefined, 'primary'), [['episode-files']], 'episode-files');
+        open('episode', episode.number + '. ' + episode.name, '<p class="detail-meta">' + esc(title.title) + ' / Season ' + season.number + '</p><p class="catalog-overview">' + esc(episode.overview) + '</p>' + button('episode-files', 'Find episode sources', 'catalog-sources', undefined, 'primary'), [['episode-files']], 'episode-files');
     }
     function sources() {
-        var suffix = episode ? '?season=' + season.number + '&episode=' + episode.number : '';
+        var suffix = '?discover=true' + (episode ? '&season=' + season.number + '&episode=' + episode.number : '');
         sourceOffset = 0;
-        load('sources', 'Your Real-Debrid files', '/api/catalog/' + encodeURIComponent(title.id) + '/sources' + suffix, function (data) { sourceResult = data; renderSources(); });
+        load('sources', 'Find sources', '/api/catalog/' + encodeURIComponent(title.id) + '/sources' + suffix, function (data) { sourceResult = data; renderSources(); }, 60000);
+        $('dialog-content').innerHTML = '<p role="status">Searching CocoScrapers and your Real-Debrid files. This can take up to 30 seconds.</p>' + button('source-cancel', 'Back to title', 'extra-back');
+        A.open('Find sources', $('dialog-content').innerHTML, [['source-cancel']], 'source-cancel');
     }
+    function sizeLabel(bytes) { return bytes ? (bytes / 1073741824).toFixed(2) + ' GB' : 'Size unknown'; }
     function renderSources() {
-        var items = sourceResult.items.slice(sourceOffset, sourceOffset + 4), html = '<p class="catalog-note">' + esc(sourceResult.notice) + '</p>', i;
+        var items = sourceResult.items.slice(sourceOffset, sourceOffset + 4), html = '<p class="catalog-note source-notice">' + esc(sourceResult.notice) + '</p>', i, rows = [];
         for (i = 0; i < items.length; i += 1) {
-            html += '<div class="source-item"><span title="' + esc(items[i].filename) + '">' + esc(items[i].filename) + '</span><small>' + esc(items[i].status) + ' / ' + (items[i].size / 1073741824).toFixed(2) + ' GB / Filename match ' + Math.round(items[i].match_score * 100) + '%</small></div>';
+            var item = items[i], id = 'source-' + i;
+            html += '<button id="' + id + '" class="source-item source-choice" data-action="source-choose" data-value="' + (sourceOffset + i) + '"><span>' + esc(item.filename) + '</span><small>' + esc(item.quality) + ' / ' + sizeLabel(item.size) + ' / ' + (item.provider === 'real_debrid_library' ? 'In your account / ' + esc(item.status) : 'CocoScrapers / ' + esc(item.scraper || 'Provider')) + (item.preferred ? ' / H.264 preferred' : '') + '</small>' + (item.warning ? '<small class="source-warning">' + esc(item.warning) + '</small>' : '') + '</button>';
+            rows.push([id]);
         }
-        if (!items.length) { html += '<p>No matching filenames in the first 100 downloads and 100 torrents. Check the title and linked account.</p>'; }
-        var ids = ['source-back']; html += '<div class="dialog-actions">' + button('source-back', 'Back to title', 'extra-back');
+        if (!items.length) { html += '<p>No matching sources were returned. Try again later or check your Real-Debrid account.</p>'; }
+        var ids = ['source-back', 'sources-retry']; html += '<div class="dialog-actions">' + button('source-back', 'Back to title', 'extra-back') + button('sources-retry', 'Search again', 'catalog-sources');
         if (sourceOffset > 0) { html += button('sources-prev', 'Previous', 'sources-prev'); ids.push('sources-prev'); }
         if (sourceOffset + 4 < sourceResult.items.length) { html += button('sources-next', 'Next', 'sources-next'); ids.push('sources-next'); }
-        html += '</div>'; open('sources', 'Your Real-Debrid files', html, [ids], ids[0]);
+        html += '</div>'; rows.push(ids); open('sources', title.title + ' / Sources', html, rows, items.length ? 'source-0' : 'sources-retry');
+    }
+    function preparationError(data) {
+        clearTimeout(playbackTimer);
+        open('prepare', 'Choose another source', '<p class="error-message" role="alert">' + fail(data) + '</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+    }
+    function showPreparation(data) {
+        playbackState = data; clearTimeout(playbackTimer);
+        if (data.state === 'ready') {
+            var saved = data.progress || {}, resume = saved.position > 1 && saved.position < saved.duration - 2;
+            var html = '<p class="ready-filename">' + esc(data.filename) + '</p>' + (data.warning ? '<p class="source-warning">' + esc(data.warning) + '. If playback fails, choose another source.</p>' : '') +
+                (data.media && data.media.checked ? '<p class="catalog-note">' + esc(data.media.video.join(', ').toUpperCase()) + (data.media.audio.length ? ' / ' + esc(data.media.audio.join(', ').toUpperCase()) : '') + '</p>' : '<p class="catalog-note">Codec details are unavailable. Try another source if video or sound does not play.</p>') +
+                '<div class="dialog-actions">' + button('playback-play', resume ? 'Resume at ' + Math.floor(saved.position / 60) + ':' + (Math.floor(saved.position % 60) < 10 ? '0' : '') + Math.floor(saved.position % 60) : 'Play', 'playback-play', 'resume', 'primary');
+            var ids = ['playback-play'];
+            if (resume) { html += button('playback-restart', 'Start from beginning', 'playback-play', 'restart'); ids.push('playback-restart'); }
+            html += button('playback-back', 'Back to sources', 'playback-back') + '</div>'; ids.push('playback-back');
+            open('prepare', data.title, html, [ids], 'playback-play'); return;
+        }
+        if (data.state === 'files') { renderFiles(); return; }
+        open('prepare', 'Preparing your video', '<p id="preparation-message" role="status">' + esc(data.message) + '</p><p class="prepare-progress">' + Math.round(data.progress || 0) + '%</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+        if (new Date().getTime() - playbackStarted > 5 * 60000) {
+            preparationError({detail:'This source is still downloading in Real-Debrid. Choose another source or try it again later.'}); return;
+        }
+        var current = ticket;
+        playbackTimer = setTimeout(function () {
+            if (view !== 'prepare' || current !== ticket) { return; }
+            req('GET', '/api/playback/' + encodeURIComponent(data.id), null, function (ok, result) {
+                if (view !== 'prepare' || current !== ticket) { return; }
+                if (ok) { showPreparation(result); } else { preparationError(result); }
+            });
+        }, Math.max(3, data.retry_after || 3) * 1000);
+    }
+    function renderFiles() {
+        var files = playbackState.files.slice(fileOffset, fileOffset + 4), html = '<p>Choose the video file to watch.</p>', rows = [], i;
+        for (i = 0; i < files.length; i += 1) {
+            var file = files[i], id = 'playback-file-' + i;
+            html += '<button id="' + id + '" class="source-item source-choice" data-action="playback-file" data-value="' + file.id + '"><span>' + esc(file.filename) + '</span><small>' + sizeLabel(file.size) + (file.warning ? ' / ' + esc(file.warning) : '') + '</small></button>'; rows.push([id]);
+        }
+        var ids = ['playback-back']; html += '<div class="dialog-actions">' + button('playback-back', 'Back to sources', 'playback-back');
+        if (fileOffset > 0) { html += button('files-prev', 'Previous', 'files-prev'); ids.push('files-prev'); }
+        if (fileOffset + 4 < playbackState.files.length) { html += button('files-next', 'Next', 'files-next'); ids.push('files-next'); }
+        html += '</div>'; rows.push(ids); open('prepare', 'Choose a video file', html, rows, files.length ? 'playback-file-0' : 'playback-back');
+    }
+    function prepareSource(index) {
+        var source = sourceResult.items[index], current = ++ticket;
+        clearTimeout(playbackTimer); playbackState = null; fileOffset = 0; playbackStarted = new Date().getTime();
+        open('prepare', 'Preparing your video', '<p role="status">Checking this source with Real-Debrid...</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+        req('POST', '/api/playback', {selection_id:source.selection_id}, function (ok, data) {
+            if (current !== ticket || view !== 'prepare') { return; }
+            if (ok) { showPreparation(data); } else { preparationError(data); }
+        }, 60000);
     }
     function accounts() {
         load('accounts', 'Your accounts', '/api/me', function (data) {
@@ -159,7 +215,7 @@
                 else { html += '<p class="catalog-note">Finish service setup in Account manager on this PC.</p>'; }
                 html += '</section>';
             }
-            html += '</div><p class="catalog-note">Use Account manager on the server, or its SSH tunnel, to add application settings, manage profiles, or enter a Real-Debrid personal token.</p><div class="dialog-actions">' + button('account-profiles', 'Change profile', 'profiles') + button('account-credits', 'Credits', 'credits') + '</div>';
+            html += '</div><p class="catalog-note">On the server computer, open http://127.0.0.1:8765/manage to add application settings, manage profiles, or enter a Real-Debrid personal token.</p><div class="dialog-actions">' + button('account-profiles', 'Change profile', 'profiles') + button('account-credits', 'Credits', 'credits') + '</div>';
             open('accounts', 'Your accounts', html, (rows.length ? [rows] : []).concat([['account-profiles', 'account-credits']]), rows[0] || 'account-profiles');
         });
     }
@@ -213,10 +269,12 @@
         });
     }
     function credits() {
-        open('credits', 'Credits', '<div class="credits-copy"><img class="tmdb-logo" src="/static/art/tmdb.svg" alt="TMDB"><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p><p>Trakt supplies catalog metadata and your watchlist. Real-Debrid supplies account file listings when connected.</p><p>FenLight+ is a reference for browsing and provider design. This is an independent implementation.</p><p class="attribution">Big Buck Bunny trailer: &copy; 2008 Blender Foundation / www.bigbuckbunny.org, Creative Commons Attribution 3.0. Sample-card illustrations are original. Vizio Media is an independent home project.</p></div>' + button('credits-back', 'Back to accounts', 'accounts'), [['credits-back']], 'credits-back');
+        open('credits', 'Credits', '<div class="credits-copy"><img class="tmdb-logo" src="/static/art/tmdb.svg" alt="TMDB"><p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p><p>Trakt supplies catalog metadata and your watchlist. Real-Debrid prepares and streams selected account files.</p><p>CocoScrapers by CocoJoe supplies source discovery. Its unchanged source archive and compatibility worker are distributed under GPL version 3. License text and source are included with the application.</p><p>FenLight+ is an architectural reference.</p><p class="attribution">Big Buck Bunny trailer: &copy; 2008 Blender Foundation / www.bigbuckbunny.org, Creative Commons Attribution 3.0. Sample-card illustrations are original. Vizio Media is an independent home project.</p></div>' + button('credits-back', 'Back to accounts', 'accounts'), [['credits-back']], 'credits-back');
     }
     function back() {
         ticket += 1;
+        clearTimeout(playbackTimer);
+        if (view === 'prepare') { renderSources(); return true; }
         if (view === 'detail') { if (detailOrigin === 'home') { A.close(); } else { renderSearch('result-0'); } return true; }
         if (view === 'seasons') { renderDetail(); return true; }
         if (view === 'episodes') { listOffset = 0; renderSeasons(); return true; }
@@ -231,7 +289,21 @@
     window.VizioExtras = {
         currentProfile: function () { return me && me.profile; },
         openTitle: function (id) { details(id, 'home'); },
-        dismiss: function () { ticket += 1; view = ''; $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); activeFlow = null; },
+        openWatching: function (id) {
+            var parts = /^(.*)-s([0-9]+)-e([0-9]+)$/.exec(id);
+            if (!parts) { details(id, 'home'); return; }
+            detailOrigin = 'home'; sourceOffset = 0;
+            load('detail', 'Resume episode', '/api/catalog/' + encodeURIComponent(parts[1]), function (data) {
+                title = data;
+                load('episode', 'Resume episode', '/api/catalog/' + encodeURIComponent(parts[1]) + '/seasons/' + parts[2], function (data) {
+                    season = data; episode = null;
+                    var i;
+                    for (i = 0; i < season.episodes.length; i += 1) { if (season.episodes[i].number === Number(parts[3])) { episode = season.episodes[i]; } }
+                    if (episode) { renderEpisode(); } else { renderEpisodes(); }
+                });
+            });
+        },
+        dismiss: function () { ticket += 1; view = ''; $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); clearTimeout(playbackTimer); activeFlow = null; },
         back: back,
         key: function (event, action) {
             var input = document.activeElement;
@@ -267,6 +339,18 @@
             if (action === 'catalog-episode') { episode = season.episodes[Number(value)]; renderEpisode(); }
             if (action === 'list-prev' || action === 'list-next') { listOffset = Math.max(0, listOffset + (action === 'list-next' ? 6 : -6)); if (view === 'seasons') { renderSeasons(); } else { renderEpisodes(); } }
             if (action === 'catalog-sources') { sources(); }
+            if (action === 'source-choose') { prepareSource(Number(value)); }
+            if (action === 'playback-back') { ticket += 1; clearTimeout(playbackTimer); renderSources(); }
+            if (action === 'playback-play') { clearTimeout(playbackTimer); A.playStream(playbackState, value === 'restart', function () { renderSources(); }); }
+            if (action === 'files-prev' || action === 'files-next') { fileOffset = Math.max(0, fileOffset + (action === 'files-next' ? 4 : -4)); renderFiles(); }
+            if (action === 'playback-file') {
+                var current = ++ticket, sessionId = playbackState.id;
+                open('prepare', 'Preparing your video', '<p role="status">Selecting the video file...</p>' + button('playback-back', 'Back to sources', 'playback-back'), [['playback-back']], 'playback-back');
+                req('POST', '/api/playback/' + encodeURIComponent(sessionId) + '/files', {file_id:Number(value)}, function (ok, data) {
+                    if (view !== 'prepare' || current !== ticket) { return; }
+                    if (ok) { showPreparation(data); } else { preparationError(data); }
+                }, 60000);
+            }
             if (action === 'sources-prev' || action === 'sources-next') { sourceOffset = Math.max(0, sourceOffset + (action === 'sources-next' ? 4 : -4)); renderSources(); }
             if (action === 'accounts') { accounts(); }
             if (action === 'account-link') { flowService = value; view = 'link'; activeFlow = null; clearInterval(flowTick); flowTick = setInterval(updateCountdown, 1000); linker.start(value); }

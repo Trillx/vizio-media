@@ -18,7 +18,7 @@
     function excerpt(copy) { return copy.length > 115 ? copy.slice(0, 112).replace(/\s+\S*$/, '') + '...' : copy; }
     function card(item, id, continuing) {
         var image = item.backdrop || item.poster, progress = item.progress;
-        var html = '<button id="' + id + '" class="home-film" data-action="' + (continuing ? 'play' : 'home-title') + '" data-value="' + esc(item.id) + '">';
+        var html = '<button id="' + id + '" class="home-film" data-action="' + (continuing ? (item.id === 'sample-bunny' ? 'play' : 'home-resume') : 'home-title') + '" data-value="' + esc(item.watching_id || item.id) + '">';
         html += '<span class="home-film-art">' + (image ? '<img loading="lazy" src="' + esc(image) + '" alt="">' : '<span class="home-film-initial" aria-hidden="true">' + esc(item.title.charAt(0)) + '</span>');
         if (progress) { html += '<span class="home-progress"><i style="width:' + Math.min(100, Math.max(0, progress.position / progress.duration * 100)) + '%"></i></span>'; }
         html += '</span><span class="home-film-name">' + esc(item.title) + '</span><span class="home-film-meta">' + esc(progress ? minutes(progress.duration - progress.position) : (item.year || 'Year unknown') + ' / ' + (item.kind === 'tv' ? 'Series' : 'Movie') + (item.sample ? ' / Sample' : '')) + '</span></button>';
@@ -125,7 +125,11 @@
     }
     function applyProgress(progress) {
         if (!personal) { return; }
-        personal.continue_watching = progress.position > 1 && progress.position < progress.duration - 2 ? [{id:'sample-bunny',title:'Big Buck Bunny',year:'2008',kind:'movie',poster:'/static/art/hero.jpg',sample:true,progress:progress}] : [];
+        var remote = personal.continue_watching.filter(function (item) { return item.id !== 'sample-bunny'; });
+        if (progress.position > 1 && progress.position < progress.duration - 2) {
+            remote.push({id:'sample-bunny',title:'Big Buck Bunny',year:'2008',kind:'movie',poster:'/static/art/hero.jpg',sample:true,progress:progress});
+        }
+        personal.continue_watching = remote;
     }
     function refreshPersonal() {
         var current = ++privateTicket, expected = profile && profile.id;
@@ -168,7 +172,11 @@
             localProgress = {position:progress.position,duration:progress.duration};
             applyProgress(localProgress);
             if (!personal || listView) { return; }
-            node = $('continue-0');
+            var index;
+            node = null;
+            for (index = 0; index < personal.continue_watching.length; index += 1) {
+                if (personal.continue_watching[index].id === 'sample-bunny') { node = $('continue-' + index); break; }
+            }
             if (node && personal.continue_watching.length) {
                 node.querySelector('.home-progress i').style.width = Math.min(100, progress.position / progress.duration * 100) + '%';
                 A.text(node.querySelector('.home-film-meta'), minutes(progress.duration - progress.position));
@@ -191,6 +199,7 @@
         activate: function (action, node) {
             var value = node.getAttribute('data-value');
             if (action === 'home-title') { window.VizioExtras.openTitle(value); }
+            if (action === 'home-resume') { window.VizioExtras.openWatching(value); }
             if (action === 'home-genre') { genre = value; listView = false; $('home-content').scrollTop = 0; loadHome('genre-' + genre); }
             if (action === 'home-watchlist') { listView = true; $('home-content').scrollTop = 0; render('nav-watchlist'); refreshPersonal(); }
             if (action === 'home-retry') { loadHome('hero-details'); }

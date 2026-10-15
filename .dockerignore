@@ -17,3 +17,12 @@
 !scripts/container_health.py
 !media/
 !media/ATTRIBUTION.md
+!coco_worker/
+!coco_worker/worker.py
+!coco_worker/README.md
+!vendor/
+!vendor/cocoscrapers-1.0.32.zip
+!vendor/cocoscrapers-provenance.json
+!vendor/GPL-3.0.txt
+!LICENSE
+!THIRD_PARTY_NOTICES.md

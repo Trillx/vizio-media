@@ -16,6 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
 
 COPY --chown=vizio:vizio app/ ./app/
 COPY --chown=vizio:vizio web/ ./web/
+COPY --chown=vizio:vizio coco_worker/ ./coco_worker/
+COPY --chown=vizio:vizio vendor/ ./vendor/
+COPY --chown=vizio:vizio LICENSE THIRD_PARTY_NOTICES.md ./
 COPY --chown=vizio:vizio run.py ./
 COPY --chown=vizio:vizio scripts/download_sample.py scripts/container_health.py ./scripts/
 COPY --chown=vizio:vizio media/ATTRIBUTION.md ./media/

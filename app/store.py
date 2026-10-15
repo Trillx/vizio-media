@@ -62,6 +62,10 @@ class Store:
                     key TEXT PRIMARY KEY, payload TEXT NOT NULL, expires_at REAL NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS flow_profile ON oauth_flows(profile_id, service);
+                CREATE TABLE IF NOT EXISTS watching_titles (
+                    profile_id TEXT NOT NULL, media_id TEXT NOT NULL, payload TEXT NOT NULL,
+                    PRIMARY KEY(profile_id, media_id)
+                );
             """)
             connection.execute("INSERT OR IGNORE INTO profiles(id, name) VALUES ('household', 'Household')")
             connection.execute("""INSERT OR IGNORE INTO playback(profile_id,title_id,position,duration,updated_at)
@@ -139,7 +143,7 @@ class Store:
         if profile_id == "household":
             raise ValueError("The Household profile cannot be deleted.")
         with self.connection() as connection:
-            for table in ("accounts","oauth_flows","playback","sessions"):
+            for table in ("accounts","oauth_flows","playback","sessions","watching_titles"):
                 connection.execute(f"DELETE FROM {table} WHERE profile_id=?", (profile_id,))
             connection.execute("DELETE FROM profiles WHERE id=?", (profile_id,))
 
@@ -246,6 +250,24 @@ class Store:
             connection.execute("""INSERT INTO playback(profile_id,title_id,position,duration) VALUES (?,?,?,?)
                 ON CONFLICT(profile_id,title_id) DO UPDATE SET position=excluded.position,duration=excluded.duration,updated_at=CURRENT_TIMESTAMP""", (profile_id,title_id,position,duration))
         return self.playback(profile_id,title_id)
+
+    def remember_watching(self, profile_id: str, media_id: str, title: dict):
+        with self.connection() as connection:
+            connection.execute("""INSERT INTO watching_titles VALUES (?,?,?)
+                ON CONFLICT(profile_id,media_id) DO UPDATE SET payload=excluded.payload""",
+                (profile_id,media_id,json.dumps(title)))
+            connection.execute("""DELETE FROM watching_titles WHERE profile_id=? AND media_id NOT IN
+                (SELECT title_id FROM playback WHERE profile_id=? ORDER BY updated_at DESC LIMIT 200)
+                AND media_id != ?""", (profile_id,profile_id,media_id))
+
+    def continue_watching(self, profile_id: str):
+        with self.connection() as connection:
+            rows=connection.execute("""SELECT w.media_id,w.payload,p.position,p.duration FROM watching_titles w
+                JOIN playback p ON p.profile_id=w.profile_id AND p.title_id=w.media_id
+                WHERE w.profile_id=? AND p.position>1 AND p.position<p.duration-2
+                ORDER BY p.updated_at DESC LIMIT 20""", (profile_id,)).fetchall()
+        return [{**json.loads(row["payload"]),"watching_id":row["media_id"],
+                 "progress":{"position":row["position"],"duration":row["duration"]}} for row in rows]
 
     def cached(self, key: str, *, stale: bool = False):
         with self.connection() as connection:

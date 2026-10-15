@@ -4,7 +4,7 @@ A self-hosted web app for Vizio SmartCast TVs. Browse catalog recommendations an
 
 The home uses a charcoal and white layout with horizontal shelves, genre filters, related titles, Trakt My list, and Continue watching for actual saved playback. The app includes an owner account manager, household profiles with optional PINs, device-code authentication, and encrypted server-side credentials.
 
-The licensed Big Buck Bunny trailer is currently the only playable video. Real-Debrid integration lists filename matches from an account's first 100 downloads and 100 torrents. Public provider search, remote playback resolution, watched-state synchronization, and scrobbling are future work. FenLight+ is an architectural reference; this project is an independent implementation.
+CocoScrapers source search and Real-Debrid playback are implemented. Choose a movie or episode, select **Find sources**, choose a source and video file, then play or resume it on the TV. Preparation progress, codec information and format warnings, byte-range seeking, expired-link refresh, and per-profile resume are included. See [playback setup and behavior](docs/playback.md). Trakt watched-state synchronization and scrobbling remain future work. The licensed Big Buck Bunny trailer remains available as a compatibility check.
 
 ## Run on Proxmox
 
@@ -81,12 +81,12 @@ python -m pytest -q
 node --test tests/remote.test.cjs tests/service-link.test.cjs
 ```
 
-Backend tests use temporary databases and fictional credentials. Optional Playwright tests use an isolated fixture on port 8767; see [testing](docs/testing.md). CI runs the Python and JavaScript suites, builds the Linux image, and checks its loopback health and owner access.
+Backend tests use temporary databases and fictional credentials. Optional Playwright tests use isolated fixtures on ports 8767 and 8768; see [testing](docs/testing.md) and [playback verification](docs/playback.md). CI runs the Python and JavaScript suites, builds the Linux image, and checks its loopback health and owner access.
 
 See [account setup](docs/accounts-and-search.md), [architecture](docs/architecture.md), and [home design](docs/home-design.md).
 
 ## Data and license
 
-The code is [MIT licensed](LICENSE). Third-party media, logos, and dependencies retain their respective terms; see [attribution](media/ATTRIBUTION.md). Vizio Media is an independent project and is not affiliated with VIZIO, TMDB, Trakt, Real-Debrid, or FenLight+.
+Original application code is [MIT licensed](LICENSE). The CocoScrapers source archive and separate compatibility worker are distributed under GPL version 3. The complete upstream source, worker source, license text, and provenance ship with the application; see [third-party notices](THIRD_PARTY_NOTICES.md). Media, logos, and other dependencies retain their respective terms; see [attribution](media/ATTRIBUTION.md). Vizio Media is an independent project and is not affiliated with VIZIO, TMDB, Trakt, Real-Debrid, FenLight+, or CocoScrapers.
 
 Credentials, pairing tokens, local addresses, account databases, encryption keys, logs, downloaded media, and local agent tooling are excluded from the public snapshot. Runtime data stays in the `app-data` Docker volume or your native `data/` directory. Preserve the database and matching `vault.key` together when backing up or moving an installation. See [security and publishing](SECURITY.md).

@@ -36,9 +36,9 @@ For this private installation, the shortest setup is a personal token from [Real
 
 Device-code login is also implemented. Configure your own registered application client ID, then connect from either interface and approve the displayed code. The adapter uses Real-Debrid's user-bound credentials and documented nonstandard token grant. The shared open-source client ID is not a default for this private project.
 
-Open a catalog title or episode and choose **Find in my Real-Debrid files**. The provider checks up to 100 account downloads and 100 torrents, compares filename words and year, and applies season/episode markers when requested. It deduplicates and ranks at most 40 matches. Results contain filenames, size, account status, and a filename-match score. A score is a text heuristic, not verification that the file is the correct title or playable.
+Open a catalog title or episode and choose **Find sources**. Search combines CocoScrapers discovery with filename matches from up to 100 account downloads and 100 torrents. Choose a source, then a video file when required, and wait for Real-Debrid to prepare it. The player supports seeking, pause, and per-profile resume. See [source search and playback](playback.md).
 
-The provider does not search public indexers, submit torrents, add downloads, unrestrict links, or expose private URLs. Playback resolution is the next independent media task. FenLight+ informs the separation of metadata, provider search, and resolution. Its code and Kodi dependencies are not embedded in this app.
+Search itself adds nothing to Real-Debrid. Selecting a CocoScrapers source submits its magnet to the selected profile's account. Private URLs remain on the backend and the TV receives an authenticated local stream. FenLight+ remains an architectural reference. CocoScrapers runs through a separate compatibility worker, with its source and GPL notices included.
 
 ## Disconnect and errors
 

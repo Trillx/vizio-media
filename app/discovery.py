@@ -92,9 +92,9 @@ class Discovery:
     def personal(self, profile_id: str) -> dict:
         profile=self.store.profile(profile_id)
         progress=self.store.playback(profile_id,"big-buck-bunny")
-        continuing=[]
+        continuing=self.store.continue_watching(profile_id)
         if 1<progress["position"]<progress["duration"]-2:
-            continuing=[{**SAMPLES[0],"progress":{"position":progress["position"],"duration":progress["duration"]}}]
+            continuing.append({**SAMPLES[0],"progress":{"position":progress["position"],"duration":progress["duration"]}})
         account=self.store.account(profile_id,"trakt")
         watchlist={"state":"disconnected","items":[],"notice":"Connect Trakt in Accounts to see your watchlist."}
         if account:
