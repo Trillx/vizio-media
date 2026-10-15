@@ -31,7 +31,7 @@ const fs = require('node:fs');
     await tv.locator('#nav-search').click();
     await tv.locator('#result-0').waitFor();
     await tv.locator('#catalog-keyboard').click();
-    assert.equal(await tv.locator(':focus').getAttribute('id'),'key-0');
+    assert.equal(await tv.locator(':focus').getAttribute('id'),'key-Q');
     // Remote focus chooses B, then typing continues with clickable keyboard keys.
     await tv.keyboard.press('ArrowRight'); await tv.keyboard.press('Enter');
     for(const letter of ['U','N','N','Y']) await tv.locator('[data-action=catalog-type][data-value="'+letter+'"]').click();

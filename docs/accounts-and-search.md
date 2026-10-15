@@ -65,3 +65,9 @@ Run one worker. In-memory locks and attempt limits are designed for that process
 Tests cover owner access, profile isolation, PIN throttling, encrypted storage, missing/mismatched keys, pending/terminal/cancelled device flows, poll intervals, rate limits, concurrent token rotation, reconnect state, catalog filtering and caching, season data, bounded artwork, and URL-free account filename results. Browser checks cover regular and on-screen search, six-result pagination, profile PIN entry, service setup, approval/cancellation, local token entry, watchlists, source results, profile changes, logout, responsive manager layout, scaled TV layouts, and diagnostic privacy.
 
 Live service approval requires the user's credentials and provider accounts. Mocked tests do not establish provider availability, codec compatibility, or playback of remote account files. Provider setup links above point to the official services. Media and logo terms are recorded in [attribution](../media/ATTRIBUTION.md).
+
+## Typing and the on-screen keyboard
+
+Search suggests up to three matching titles after two characters, with a short pause between requests. Physical typing and the remote keyboard use the same suggestions. Down from the search field reaches suggestions; OK opens the chosen title. Suggestions retain typing focus and ignore late responses from an older query. Press Search or Enter for the full results and pagination. Clearing the query restores the previous results.
+
+The remote keyboard uses a number row followed by QWERTY, ASDF, and ZXCV rows, plus Space, Delete, and Clear. Its focus starts at Q. Movies and Series filters also apply to suggestions; Trakt watchlist keeps its existing list behavior.

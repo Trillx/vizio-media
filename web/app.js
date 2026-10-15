@@ -464,6 +464,12 @@
             setMode('extra', [['dialog-close']].concat(nextRows), id || 'dialog-close');
         },
         close: closeDialog,
+        extraRows: function (nextRows, fallback) {
+            if (mode !== 'extra') { return; }
+            var id = document.activeElement && document.activeElement.id;
+            rows = [['dialog-close']].concat(nextRows);
+            focusId(byId(id) ? id : fallback || 'catalog-query');
+        },
         homeRows: function (nextRows, preferred) {
             homeRows = nextRows;
             if (mode === 'home') { rows = homeRows; focusId(preferred || (focused && focused.id) || 'hero-details'); }

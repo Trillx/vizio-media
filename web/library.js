@@ -4,18 +4,22 @@
     var A = window.VizioApp, esc = A.escape, req = A.request;
     var $ = function (id) { return document.getElementById(id); };
     var view = '', ticket = 0, meTicket = 0, me = null, profileList = [], pinProfile = null;
-    var query = '', kind = 'all', page = 1, offset = 0, results = null, keyboard = false, searchError = '';
+    var query = '', resultQuery = '', kind = 'all', page = 1, offset = 0, results = null, keyboard = false, searchError = '';
     var title = null, season = null, episode = null, listOffset = 0, sourceResult = null, sourceOffset = 0, detailOrigin = 'search';
     var flowService = '', flowTick = null, activeFlow = null;
     var names = {trakt: 'Trakt', real_debrid: 'Real-Debrid'};
     var playbackState = null, playbackTimer = null, playbackStarted = 0, fileOffset = 0;
     var automatic = null, SOURCE_PAGE_SIZE = 3;
+    var searchRows = [], suggestionState = {state: 'idle', items: []};
+    var suggestions = window.VizioSuggestions.create(req, updateSuggestions);
     function button(id, label, action, value, classes) {
         return '<button id="' + id + '" class="button ' + (classes || 'secondary') + '" data-action="' + action + '"' +
             (value === undefined ? '' : ' data-value="' + esc(value) + '"') + '>' + esc(label) + '</button>';
     }
     function open(next, heading, html, rows, focus) {
-        view = next; $('dialog').setAttribute('data-extra', next); A.open(heading, html, rows, focus);
+        view = next;
+        if (next !== 'search') { suggestions.clear(); }
+        $('dialog').setAttribute('data-extra', next); A.open(heading, html, rows, focus);
     }
     function fail(data) { return esc((data && data.detail) || 'The server could not complete this request. Try again.'); }
     function loading(message, note) {
@@ -45,6 +49,8 @@
     }
     function search(start) {
         if ($('catalog-query')) { query = $('catalog-query').value.slice(0, 120); }
+        resultQuery = query;
+        suggestions.clear();
         keyboard = false;
         if (start) { page = 1; offset = 0; }
         results = null; searchError = ''; renderSearch();
@@ -52,12 +58,37 @@
         var path = kind === 'watchlist' ? '/api/catalog/watchlist' : '/api/catalog/search?q=' + encodeURIComponent(query) + '&kind=' + kind + '&page=' + page;
         req('GET', path, null, function (ok, data) {
             if (ticket !== current || view !== 'search') { return; }
-            results = ok ? data : null; searchError = ok ? '' : fail(data); renderSearch();
+            var active = document.activeElement, focused = active && active.id;
+            var caret = focused === 'catalog-query' ? active.selectionStart : null;
+            results = ok ? data : null; searchError = ok ? '' : fail(data); renderSearch(focused);
+            if (caret !== null && $('catalog-query') === document.activeElement) { $('catalog-query').setSelectionRange(caret, caret); }
         });
+    }
+    function updateSuggestions(state) {
+        suggestionState = state;
+        if (view !== 'search' || !$('catalog-suggestions')) { return; }
+        var html = '', ids = [], i, items = state.items;
+        var message = state.state === 'loading' ? 'Looking for matching titles...' : state.state === 'error' ? 'Suggestions unavailable. Press Search to try again.' : items.length ? 'Suggested titles' : state.state === 'ready' ? 'No matching suggestions. Try another title.' : '';
+        html += '<p id="catalog-suggestion-status" class="suggestion-status" role="status">' + esc(message) + '</p><div class="suggestion-titles">';
+        for (i = 0; i < items.length; i += 1) {
+            ids.push('suggestion-' + i);
+            html += '<button id="suggestion-' + i + '" class="title-suggestion" data-action="catalog-detail" data-value="' + esc(items[i].id) + '"><strong>' + esc(items[i].title) + '</strong><small>' + esc(items[i].year || 'Year unknown') + ' / ' + (items[i].kind === 'tv' ? 'Series' : 'Movie') + '</small></button>';
+        }
+        $('catalog-suggestions').innerHTML = html + '</div>';
+        $('catalog-suggestions').hidden = state.state === 'idle';
+        if ($('catalog-results')) { $('catalog-results').hidden = state.state !== 'idle'; }
+        var rows = searchRows.slice(0, !keyboard && state.state !== 'idle' ? 2 : searchRows.length);
+        if (ids.length) { rows.splice(1, 0, ids); }
+        A.extraRows(rows, keyboard ? 'key-Q' : 'catalog-query');
+    }
+    function suggest() {
+        if (view !== 'search' || !$('catalog-query')) { return; }
+        query = $('catalog-query').value.slice(0, 120);
+        suggestions.search(query, kind);
     }
     function renderSearch(focus) {
         var html = '<div class="search-line"><input id="catalog-query" class="tv-input" type="text" maxlength="120" autocomplete="off" aria-label="Search movies and series" placeholder="Title or year" value="' + esc(query) + '">' +
-            button('catalog-submit', 'Search', 'catalog-search', undefined, 'primary') + button('catalog-keyboard', keyboard ? 'Hide keyboard' : 'Keyboard', 'catalog-keyboard') + '</div>';
+            button('catalog-submit', 'Search', 'catalog-search', undefined, 'primary') + button('catalog-keyboard', keyboard ? 'Hide keyboard' : 'Keyboard', 'catalog-keyboard') + '</div><section id="catalog-suggestions" class="catalog-suggestions" aria-label="Suggested titles" hidden></section>';
         var rows = [['catalog-query', 'catalog-submit', 'catalog-keyboard']], filters = ['all', 'movie', 'tv', 'watchlist'];
         var labels = ['All titles', 'Movies', 'Series', 'Trakt watchlist'], ids = [], i, r;
         html += '<div class="filter-line">';
@@ -68,11 +99,12 @@
         html += '</div>'; rows.push(ids);
         if (keyboard) {
             html += '<div class="tv-keyboard" aria-label="On-screen keyboard">';
-            var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            for (r = 0; r < 6; r += 1) {
+            var letters = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+            for (r = 0; r < letters.length; r += 1) {
                 ids = []; html += '<div class="keyboard-row">';
-                for (i = r * 6; i < r * 6 + 6; i += 1) {
-                    ids.push('key-' + i); html += '<button id="key-' + i + '" class="keyboard-key" data-action="catalog-type" data-value="' + letters.charAt(i) + '">' + letters.charAt(i) + '</button>';
+                for (i = 0; i < letters[r].length; i += 1) {
+                    var letter = letters[r].charAt(i);
+                    ids.push('key-' + letter); html += '<button id="key-' + letter + '" class="keyboard-key" data-action="catalog-type" data-value="' + letter + '">' + letter + '</button>';
                 }
                 rows.push(ids); html += '</div>';
             }
@@ -80,8 +112,8 @@
             rows.push(['key-space', 'key-delete', 'key-clear']);
         } else {
             var items = results ? results.items : [], shown = items.slice(offset, offset + 6);
-            html += '<p class="catalog-note" role="status">' + (searchError || (!results ? 'Searching...' : results.notice ? esc(results.notice) :
-                (kind === 'watchlist' ? 'Your Trakt watchlist' : (query ? 'Results for "' + esc(query) + '"' : 'Explore this week')) + ' / ' + esc(results.source.toUpperCase()) + (results.stale ? ' / Saved results, service unavailable' : ''))) + '</p>';
+            html += '<div id="catalog-results"><p class="catalog-note" role="status">' + (searchError || (!results ? 'Searching...' : results.notice ? esc(results.notice) :
+                (kind === 'watchlist' ? 'Your Trakt watchlist' : (resultQuery ? 'Results for "' + esc(resultQuery) + '"' : 'Explore this week')) + ' / ' + esc(results.source.toUpperCase()) + (results.stale ? ' / Saved results, service unavailable' : ''))) + '</p>';
             html += '<div class="catalog-grid">';
             ids = [];
             for (i = 0; i < shown.length; i += 1) {
@@ -98,10 +130,12 @@
             ids = []; html += '<div class="catalog-pages"><div>';
             if (offset > 0 || page > 1) { html += button('catalog-prev', 'Previous', 'catalog-prev', undefined, 'secondary compact'); ids.push('catalog-prev'); }
             if (results && (offset + 6 < items.length || page < results.total_pages)) { html += button('catalog-next', 'Next', 'catalog-next', undefined, 'secondary compact'); ids.push('catalog-next'); }
-            html += '</div><span>' + (results && items.length ? (offset + 1) + '-' + Math.min(offset + 6, items.length) + ' / Page ' + page + ' of ' + results.total_pages : '') + '</span></div>';
+            html += '</div><span>' + (results && items.length ? (offset + 1) + '-' + Math.min(offset + 6, items.length) + ' / Page ' + page + ' of ' + results.total_pages : '') + '</span></div></div>';
             if (ids.length) { rows.push(ids); }
         }
-        open('search', 'Find your next watch', html, rows, focus || (keyboard ? 'key-0' : 'catalog-submit'));
+        searchRows = rows;
+        open('search', 'Find your next watch', html, rows, focus || (keyboard ? 'key-Q' : 'catalog-submit'));
+        updateSuggestions(suggestionState);
     }
     function details(id, origin) {
         detailOrigin = origin || 'search';
@@ -345,6 +379,7 @@
         if (view === 'link') { linker.cancel(); clearInterval(flowTick); accounts(); return true; }
         if (view === 'credits' || view === 'confirm') { accounts(); return true; }
         if (view === 'search' && keyboard) { keyboard = false; renderSearch(); return true; }
+        if (view === 'search' && suggestionState.state !== 'idle') { suggestions.clear(); A.focus('catalog-query'); return true; }
         return false;
     }
     window.VizioExtras = {
@@ -364,7 +399,7 @@
                 });
             });
         },
-        dismiss: function () { cancelAutomatic(); ticket += 1; view = ''; $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); clearTimeout(playbackTimer); activeFlow = null; },
+        dismiss: function () { cancelAutomatic(); ticket += 1; view = ''; suggestions.clear(); $('dialog').removeAttribute('data-extra'); linker.cancel(); clearInterval(flowTick); clearTimeout(playbackTimer); activeFlow = null; },
         back: back,
         key: function (event, action) {
             var input = document.activeElement;
@@ -395,6 +430,7 @@
                 input = $('catalog-query'); query = input.value;
                 query = action === 'catalog-type' ? (query + value).slice(0, 120) : action === 'catalog-delete' ? query.slice(0, -1) : '';
                 input.value = query;
+                suggest();
             }
             if (action === 'catalog-next') { if (offset + 6 < results.items.length) { offset += 6; renderSearch('result-0'); } else { page += 1; offset = 0; search(false); } }
             if (action === 'catalog-prev') { if (offset > 0) { offset = Math.max(0, offset - 6); renderSearch('result-0'); } else { page = Math.max(1, page - 1); offset = 0; search(false); } }
@@ -439,7 +475,8 @@
         }
     };
     document.addEventListener('click', function (event) { if (event.target.tagName === 'INPUT') { A.focus(event.target.id); } }, false);
-    window.addEventListener('pagehide', function () { cancelAutomatic(); linker.stop(); clearInterval(flowTick); }, false);
+    document.addEventListener('input', function (event) { if (event.target.id === 'catalog-query') { suggest(); } }, false);
+    window.addEventListener('pagehide', function () { cancelAutomatic(); suggestions.clear(); linker.stop(); clearInterval(flowTick); }, false);
     refreshMe(function (ok) {
         if (!ok || me.profile) { return; }
         req('GET', '/api/profiles', null, function (good, data) {

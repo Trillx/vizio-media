@@ -5,7 +5,7 @@ Python 3.12 or newer and the development requirements run the backend and ES5 sy
 ```sh
 pip install -r requirements-dev.txt
 python -m pytest -q
-node --test tests/remote.test.cjs tests/service-link.test.cjs tests/source-playback.test.cjs
+node --test tests/remote.test.cjs tests/service-link.test.cjs tests/source-playback.test.cjs tests/provider-settings.test.cjs tests/suggestions.test.cjs
 ```
 
 The Python suite creates temporary SQLite databases and mocks provider HTTP responses. It checks encryption, profile isolation, authentication state, catalog and home collections, stale metadata, scoped watchlists, byte ranges, and request guards. Playback checks cover source deduplication, the actual bundled CocoScrapers parser, file selection, concurrent clicks, episode matching, signed-link refresh, CDN MIME headers, codec warnings, stream isolation, and resume. Test credentials are fictional and must never be replaced with real accounts.
@@ -30,3 +30,5 @@ These scripts default to installed Edge on Windows. Set `VIZIO_BROWSER_CHANNEL=c
 For Real-Debrid playback, run `python tests/serve_playback_mock.py` and `node tests/browser-playback.cjs` in separate terminals. For automatic source recovery, source pagination, loading indicators, and provider settings, use a fresh `python tests/serve_autoplay_mock.py` process on port 8769 and run `node tests/browser-autoplay.cjs`. Both use the licensed sample media, controlled service responses, and temporary databases. See [playback verification](playback.md).
 
 Desktop browser tests do not establish firmware-specific behavior. Test scrolling, focus, key codes, decoding, sound, and resume on each actual TV.
+
+For provider-list recovery, QWERTY navigation, and autocomplete, start a fresh `python tests/serve_search_mock.py` and run `node tests/browser-search.cjs`. It uses `http://localhost:8770` and a fictional fixture owner login. The script creates a separate browser context. Keep test logins separate from household browser sessions, because cookies on the same hostname are shared across ports. The fixture returns one provider-list failure and controlled slow, empty, and unavailable search responses.

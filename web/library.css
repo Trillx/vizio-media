@@ -22,10 +22,20 @@
 .catalog-card:focus, .catalog-card.focused, .catalog-card:hover, .keyboard-key:focus, .keyboard-key.focused { outline: 4px solid #ffffff; outline-offset: 4px; background: #414141; }
 .catalog-pages { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
 .catalog-pages span { color: #bdbdb7; font-size: 20px; }
-.tv-keyboard { width: 840px; margin: 4px auto 0; }
+.tv-keyboard { width: 1120px; margin: 4px auto 0; }
 .keyboard-row { display: flex; justify-content: center; margin-bottom: 14px; }
 .keyboard-key { width: 116px; height: 64px; background: #2e2e2e; border-radius: 8px; font-size: 27px; margin-right: 16px; }
 .keyboard-key.wide { width: 248px; font-size: 24px; }
+.tv-keyboard .keyboard-key { width: 90px; margin-right: 12px; }
+.tv-keyboard .keyboard-key.wide { width: 270px; }
+.catalog-suggestions { margin: -6px 0 20px; }
+.catalog-suggestions[hidden] { display: none; }
+.dialog-panel .suggestion-status { color: #bdbdb7; font-size: 20px; margin: 0 0 10px; }
+.suggestion-titles { display: flex; }
+.title-suggestion { width: 32%; min-height: 72px; padding: 12px 18px; margin-right: 16px; border-radius: 8px; background: #2e2e2e; text-align: left; }
+.title-suggestion strong { display: block; font-size: 22px; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title-suggestion small { display: block; color: #bdbdb7; font-size: 18px; margin-top: 6px; }
+.title-suggestion:focus, .title-suggestion.focused { outline: 4px solid #ffffff; outline-offset: 4px; background: #414141; }
 .account-columns { display: flex; margin: 30px 0 26px; }
 .account-service { width: 50%; padding-right: 40px; }
 .account-service + .account-service { border-left: 1px solid #5e5e5a; padding-left: 40px; }

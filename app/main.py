@@ -141,7 +141,7 @@ def create_app(settings: Settings | None = None, *, test_client: bool = False, t
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "version": "0.4.0", "media_ready": (settings.media_dir / "sample.mp4").is_file()}
+        return {"status": "ok", "version": "0.4.1", "media_ready": (settings.media_dir / "sample.mp4").is_file()}
 
     @app.get("/api/progress/{title_id}")
     def get_progress(title_id: str, request: Request):

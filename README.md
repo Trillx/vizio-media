@@ -78,7 +78,7 @@ Use the D-pad to select genres and scroll shelves; OK opens a title. Back restor
 ```sh
 pip install -r requirements-dev.txt
 python -m pytest -q
-node --test tests/remote.test.cjs tests/service-link.test.cjs tests/source-playback.test.cjs
+node --test tests/remote.test.cjs tests/service-link.test.cjs tests/source-playback.test.cjs tests/provider-settings.test.cjs tests/suggestions.test.cjs
 ```
 
 Backend tests use temporary databases and fictional credentials. Optional Playwright tests use isolated fixtures on ports 8767 and 8768; see [testing](docs/testing.md) and [playback verification](docs/playback.md). CI runs the Python and JavaScript suites, builds the Linux image, and checks its loopback health and owner access.

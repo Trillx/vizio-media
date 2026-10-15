@@ -4,6 +4,7 @@
     var $ = function (id) { return document.getElementById(id); };
     var setup = false, profiles = [], selected = '', config = {}, activeTab = 'profiles';
     var linker = null, flow = null, flowTimer = null, flowService = '';
+    var providerTicket = 0;
     var labels = {trakt: 'Trakt', real_debrid: 'Real-Debrid', tmdb: 'TMDB'};
     function esc(value) { return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
     function show(id, visible) { $(id).hidden = !visible; }
@@ -13,7 +14,7 @@
         if (payload !== null) { xhr.setRequestHeader('X-Vizio-Media', '1'); xhr.setRequestHeader('Content-Type', 'application/json'); }
         function done() {
             var data; try { data = JSON.parse(xhr.responseText); } catch (ignored) { data = {detail: 'The server could not be reached. Check that Vizio Media is running.'}; }
-            if (!callback) { return; } var fn = callback; callback = null; fn(xhr.status >= 200 && xhr.status < 300, data);
+            if (!callback) { return; } var fn = callback; callback = null; fn(xhr.status >= 200 && xhr.status < 300, data, xhr.status);
         }
         xhr.onload = done; xhr.onerror = done; xhr.ontimeout = done; xhr.send(payload === null ? null : JSON.stringify(payload));
     }
@@ -34,16 +35,28 @@
             if (data.signed_in) { dashboard(); }
         });
     }
-    function dashboard() {
-        request('GET', '/api/admin/source-providers', null, function (ok, data) {
-            if (!ok) { error(data); return; }
+    function loadProviders() {
+        var current = ++providerTicket, submit = $('source-providers').querySelector('button[type="submit"]');
+        submit.disabled = true;
+        $('provider-options').innerHTML = '<legend>Search providers</legend><p role="status">Loading providers...</p>';
+        request('GET', '/api/admin/source-providers', null, function (ok, data, statusCode) {
+            if (current !== providerTicket) { return; }
+            if (!ok || !data || !Array.isArray(data.providers)) {
+                $('provider-options').innerHTML = '<legend>Search providers</legend><p class="error" role="alert">' +
+                    esc(statusCode === 401 ? 'Your sign-in expired. Sign in again to load providers.' : (data && data.detail) || 'Providers could not be loaded. Check the server and try again.') +
+                    '</p>' + action(statusCode === 401 ? 'Sign in again' : 'Retry', 'providers-retry');
+                return;
+            }
             var html = '<legend>Search providers</legend>';
             data.providers.forEach(function (provider) {
                 html += '<label class="provider-option" for="provider-' + esc(provider.id) + '"><input id="provider-' + esc(provider.id) + '" name="provider" type="checkbox" value="' + esc(provider.id) + '"' + (provider.enabled ? ' checked' : '') + '><span><strong>' + esc(provider.name) + '</strong><small>' + esc(provider.scope) + '</small></span></label>';
             });
             $('provider-options').innerHTML = html;
-            $('source-providers').querySelector('button[type="submit"]').disabled = false;
+            submit.disabled = false;
         });
+    }
+    function dashboard() {
+        loadProviders();
         request('GET', '/api/admin/config', null, function (ok, data) {
             if (!ok) { error(data); return; } config = data;
             ['tmdb', 'trakt', 'real_debrid'].forEach(function (service) {
@@ -115,6 +128,7 @@
         if (!node || node === document) { return; }
         var name = node.getAttribute('data-action'), value = node.getAttribute('data-value');
         if (name === 'tab') { tab(value); }
+        if (name === 'providers-retry') { status(); }
         if (name === 'settings') { tab('settings'); $('setup-' + value).querySelector('input').focus(); }
         if (name === 'logout') { cancelFlow(); request('POST', '/api/admin/logout', {}, function (ok, data) { if (ok) { profiles = []; selected = ''; $('profile-detail').innerHTML = ''; document.querySelectorAll('input').forEach(function (input) { input.value = ''; }); show('message', false); status(); } else { error(data); } }); }
         if (name === 'select-profile') { cancelFlow(); selected = value; renderProfiles(); }
